@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 2.8)
 set(SRC
         src/cJSON.h
         src/cJSON.c
-        src/ck-crowdnode.c
+        src/ck-crowdnode-server.c
         )
 
 add_executable(ck-crowdnode-server ${SRC})
