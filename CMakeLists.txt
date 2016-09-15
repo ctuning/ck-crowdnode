@@ -3,10 +3,10 @@ project(CKNodeServer)
 cmake_minimum_required(VERSION 2.8)
 
 set(SRC
-        cJSON.h
-        cJSON.c
-        CKnode.c
+        src/cJSON.h
+        src/cJSON.c
+        src/ck-crowdnode.c
         )
 
-add_executable(CKNodeServer ${SRC})
-target_link_libraries(CKNodeServer m)
+add_executable(ck-crowdnode-server ${SRC})
+target_link_libraries(ck-crowdnode-server m)
