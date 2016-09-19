@@ -8,22 +8,30 @@
 #
 # Developer: Daniil Efremov
  */
-#include<stdio.h>
-#include<string.h>
-#include<arpa/inet.h>
-#include<unistd.h>
+#include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 
 #ifdef __linux__
-#include <sys/socket.h> /* socket, connect */
-#include <netdb.h> /* struct hostent, gethostbyname */
-#include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
-#include <ctype.h>
+    #include <unistd.h>
+    #include <arpa/inet.h>
+    #include <sys/socket.h> /* socket, connect */
+    #include <netdb.h> /* struct hostent, gethostbyname */
+    #include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
+    #include <ctype.h>
 
 #elif _WIN32
-#include <winsock2.h>
+    #include <winsock2.h>
     #include <ws2tcpip.h>
     #include <windows.h>
+
+    struct thread_win_params {
+      int sock; 
+      int newsock;
+    };
+
+    void doProcessingWin (struct thread_win_params* twp);
+
     #pragma comment(lib,"ws2_32.lib") //Winsock Library
 #else
 #endif
@@ -92,10 +100,32 @@ static const int DEFAULT_SERVER_PORT = 3333;
 
 void doProcessing(int sock);
 
+void sendErrorMessage(int sock, char * errorMessage) {
+    perror(errorMessage);
+
+    cJSON *resultJSON = cJSON_CreateObject();
+    cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("1"));
+    cJSON_AddItemToObject(resultJSON, "error", cJSON_CreateString(errorMessage));
+    char * resultJSONtext = cJSON_Print(resultJSON);
+    int n = write(sock , resultJSONtext , strlen(resultJSONtext));
+    cJSON_Delete(resultJSON);
+    free(resultJSONtext);
+    if (n < 0) {
+        perror("ERROR writing to socket");
+        return ;
+    }
+}
+
 int main( int argc, char *argv[] ) {
 
     int sockfd, newsockfd,  clilen;
     int portno =DEFAULT_SERVER_PORT;
+    unsigned long win_thread_id;
+
+#ifdef _WIN32
+    struct thread_win_params twp;
+    struct thread_win_params* ptwp=&twp;
+#endif
 
     struct sockaddr_in serv_addr, cli_addr;
     int pid;
@@ -104,7 +134,7 @@ int main( int argc, char *argv[] ) {
         portno = DEFAULT_SERVER_PORT;
         printf("[INFO]: Default server port  %i\n", DEFAULT_SERVER_PORT);
     } else if (argc == 2) {
-        portno = (int)argv[2];
+        portno = atol(argv[2]);
     } else if (argc > 2)  {
         printf("USAGE: %s [serverport]  %i\n", argv[0]);
         exit(1);
@@ -117,7 +147,7 @@ int main( int argc, char *argv[] ) {
         exit(1);
     }
 
-    bzero((char *) &serv_addr, sizeof(serv_addr));
+    memset((char *) &serv_addr, sizeof(serv_addr), 0);
 
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
@@ -145,6 +175,19 @@ int main( int argc, char *argv[] ) {
         /**
          * Create child process
          */
+#ifdef _WIN32
+        ptwp->sock=sockfd;
+        ptwp->newsock=newsockfd;
+
+        if (!CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)doProcessingWin,
+                         (struct thread_win_params*) ptwp, 0, &win_thread_id))
+        {
+            perror("ERROR on fork");
+            exit(1);
+        }
+
+        closesocket(sockfd);
+#else
         pid = fork();
 
         if (pid < 0) {
@@ -159,12 +202,34 @@ int main( int argc, char *argv[] ) {
         } else {
             close(newsockfd);
         }
+#endif
     }
 }
 
+#ifdef _WIN32
+void doProcessingWin (struct thread_win_params* ptwp)
+{
+    int sockfd=ptwp->sock;
+    int newsockfd=ptwp->newsock;
+
+    // Child process - talk with connected client
+    doProcessing (newsockfd);
+
+    if (shutdown (newsockfd, 2)!=0)
+    {
+        perror("Error on fork");
+        exit(1);
+    }
+
+    closesocket(newsockfd);
+
+    return;
+}
+#endif
+
 void doProcessing(int sock) {
     char *client_message = malloc(MAX_BUFFER_SIZE);
-    char buffer[MAX_BUFFER_SIZE];
+    char buffer = malloc(MAX_BUFFER_SIZE);
     memset(buffer, MAX_BUFFER_SIZE, 0);
     memset(client_message, MAX_BUFFER_SIZE, 0);
     int buffer_read = 0;
@@ -334,20 +399,4 @@ void doProcessing(int sock) {
     }
     cJSON_Delete(commandJSON);
     free(client_message);
-}
-
-void sendErrorMessage(int sock, char * errorMessage) {
-    perror(errorMessage);
-
-    cJSON *resultJSON = cJSON_CreateObject();
-    cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("1"));
-    cJSON_AddItemToObject(resultJSON, "error", cJSON_CreateString(errorMessage));
-    char * resultJSONtext = cJSON_Print(resultJSON);
-    int n = write(sock , resultJSONtext , strlen(resultJSONtext));
-    cJSON_Delete(resultJSON);
-    free(resultJSONtext);
-    if (n < 0) {
-        perror("ERROR writing to socket");
-        return ;
-    }
 }

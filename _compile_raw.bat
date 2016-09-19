@@ -7,6 +7,4 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 mkdir build
 cd build
 
-cmake ..
-
-msbuild /p:Configuration=Release /p:Platform=Win32 CKNodeServer.sln
+cl ../src/*.c /Feck-crowdtune.exe /link wsock32.lib
