@@ -10,21 +10,42 @@
  */
 #include<stdio.h>
 #include<string.h>
-#include<sys/socket.h>
 #include<arpa/inet.h>
 #include<unistd.h>
 #include <stdlib.h>
-#include "cJSON.h"
 
-static char *const JSON_PARAM_NAME_COMMAND = "command";
+#ifdef __linux__
+#include <sys/socket.h> /* socket, connect */
+#include <netdb.h> /* struct hostent, gethostbyname */
+#include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
+#include <ctype.h>
+
+#elif _WIN32
+#include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <windows.h>
+    #pragma comment(lib,"ws2_32.lib") //Winsock Library
+#else
+#endif
+
+#include "cJSON.h"
+#include "base64.h"
+#include "urldecoder.h"
+
+static char *const CK_JSON_KEY = "ck_json=";
+
+static char *const JSON_PARAM_NAME_COMMAND = "action";
 static char *const JSON_PARAM_PARAMS = "parameters";
 static char *const JSCON_PARAM_VALUE_PUSH = "push";
+static char *const JSON_PARAM_FILE_NAME = "filename";
+static char *const JSON_PARAM_FILE_CONTENT = "file_content_base64";
 
 /**
  * todo move out to config /etc/ck-crowdnode/ck-crowdnode.properties
  */
-static const int MAX_BUFFER_SIZE = 20000;
-static const int DEFAULT_SERVER_PORT = 8888;
+static const int MAX_BUFFER_SIZE = 1024;
+static const int DEFAULT_SERVER_PORT = 3333;
+
 
 /**
  * Input: command in CK JSON format TDB
@@ -73,7 +94,9 @@ void doProcessing(int sock);
 
 int main( int argc, char *argv[] ) {
 
-    int sockfd, newsockfd, portno, clilen;
+    int sockfd, newsockfd,  clilen;
+    int portno =DEFAULT_SERVER_PORT;
+
     struct sockaddr_in serv_addr, cli_addr;
     int pid;
 
@@ -81,7 +104,7 @@ int main( int argc, char *argv[] ) {
         portno = DEFAULT_SERVER_PORT;
         printf("[INFO]: Default server port  %i\n", DEFAULT_SERVER_PORT);
     } else if (argc == 2) {
-        portno = argv[2];
+        portno = (int)argv[2];
     } else if (argc > 2)  {
         printf("USAGE: %s [serverport]  %i\n", argv[0]);
         exit(1);
@@ -130,67 +153,124 @@ int main( int argc, char *argv[] ) {
         }
 
         if (pid == 0) {
-            /* This is the client process */
             close(sockfd);
             doProcessing(newsockfd);
             exit(0);
-        }
-        else {
+        } else {
             close(newsockfd);
         }
     }
 }
 
 void doProcessing(int sock) {
-    cJSON *commandJSON;
+    char *client_message = malloc(MAX_BUFFER_SIZE);
+    char buffer[MAX_BUFFER_SIZE];
+    memset(buffer, MAX_BUFFER_SIZE, 0);
+    memset(client_message, MAX_BUFFER_SIZE, 0);
+    int buffer_read = 0;
+    int total_read = 0;
 
-    int n;
-    char client_message[MAX_BUFFER_SIZE];
-    bzero(client_message,MAX_BUFFER_SIZE);
-
-    //todo think abount big messages: while((read_size = recv(client_sock , client_message , MAX_BUFFER_SIZE, 0)) > 0 )
-    n = read(sock, client_message, MAX_BUFFER_SIZE - 1);
-
-    if (n < 0) {
-        perror("[ERROR]: reading from socket");
-        exit(1);
+    //buffered read from socket
+    while(1) {
+        buffer_read = read(sock, buffer, MAX_BUFFER_SIZE);
+        if (buffer_read > 0) {
+            realloc(client_message, total_read + buffer_read);
+            memcpy(client_message + total_read, buffer, buffer_read);
+            memset(buffer, MAX_BUFFER_SIZE, 0);
+            total_read = total_read + buffer_read;
+        } else if (buffer_read < 0) {
+            /* close file and delete it, since data is not complete
+               report error, or whatever */
+            perror("[ERROR]: reading from socket");
+            exit(1);
+        }
+        if (buffer_read == 0 || buffer_read < MAX_BUFFER_SIZE) {
+            /* message received successfully */
+            break;
+        }
     }
 
-    printf("[DEBUG INFO]: Get client message: %s\n", client_message); // todo remove debug info later
-    commandJSON = cJSON_Parse(client_message);
+    char *decodedJSON;
+    char *encodedJSONPostData = strstr(client_message, CK_JSON_KEY);
+    if (encodedJSONPostData != NULL) {
+        char *encodedJSON = encodedJSONPostData + strlen(CK_JSON_KEY);
+        decodedJSON = url_decode(encodedJSON, total_read - (encodedJSON - client_message));
+    } else {
+        decodedJSON = client_message;
+    }
+
+    printf("[DEBUG INFO]: decodedJSON message: %s\n", decodedJSON);
+    cJSON *commandJSON = cJSON_Parse(decodedJSON);
     if (!commandJSON) {
-        printf("[ERROR]: Invalid command JSON format for message: %s\n", client_message);
+        printf("[ERROR]: Invalid action JSON format for message: \n");
         //todo check if need to cJSON_Delete(commandJSON) here as well
+        sendErrorMessage(sock, "Invalid action JSON format for message");
         return;
     }
 
-    // Supported JSON commands:
-    char*  command = cJSON_GetObjectItem(commandJSON, JSON_PARAM_NAME_COMMAND)->valuestring;
-    printf("[DEBUG INFO]: Get command: %s\n", command);
+
+    cJSON *actionJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_NAME_COMMAND);
+    if (!actionJSON) {
+        printf("[ERROR]: Invalid action JSON format for message: \n");
+        //todo check if need to cJSON_Delete(commandJSON) here as well
+        sendErrorMessage(sock, "Invalid action JSON format for message: no action found");
+        return;
+    }
+    char *action = actionJSON->valuestring;
+    printf("[DEBUG INFO]: Get action: %s\n", action);
     char *resultJSONtext;
-    if (strncmp(command, JSCON_PARAM_VALUE_PUSH, 4) == 0 ) {
+    if (strncmp(action, JSCON_PARAM_VALUE_PUSH, 4) == 0 ) {
         //  push file (to send file to CK Node )
-        cJSON* params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
-        char* fileName = cJSON_GetObjectItem(params, "filename")->valuestring;
-        char* encodedData = cJSON_GetObjectItem(params, "data")->valuestring;
+        cJSON *filenameJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_NAME);
+        if (!filenameJSON) {
+            printf("[ERROR]: Invalid action JSON format for message: %s\n");
+            //todo check if need to cJSON_Delete(commandJSON) here as well
+            sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found");
+            return;
+        }
+
+        char* fileName = filenameJSON->valuestring;
+        cJSON *fileContentJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_CONTENT);
+        if (!fileContentJSON) {
+            printf("[ERROR]: Invalid action JSON format for message: \n");
+            //todo check if need to cJSON_Delete(commandJSON) here as well
+            sendErrorMessage(sock, "Invalid action JSON format for message: no fileContentJSON found");
+            return;
+        }
+
+        char* file_content_base64 = fileContentJSON->valuestring;
 
         printf("[DEBUG INFO]: File name: %s\n", fileName);
-        printf("[DEBUG INFO]: Data: %s\n", encodedData);
+        printf("[DEBUG INFO]: Data: %s\n", file_content_base64);
 
-        // todo implement:
-        // 1) decode encoded binary from JSON paramter
+        char *file_content = malloc(Base64decode_len(file_content_base64));
+        int bytesDecoded = Base64decode(file_content , file_content_base64);
+        if (bytesDecoded == 0) {
+            sendErrorMessage(sock, "Failed to Base64 decode file");
+        }   
+        printf("[DEBUG INFO]: bytesDecoded: %i\n", bytesDecoded);
+
         // 2) save locally at tmp dir
-        // 3) send back JSON with compile UID + путь, etc .
+        FILE *file=fopen("/tmp/dividiti/test.bin","wb");
 
+        int results = fputs(file_content, file);
+        if (results == EOF) {
+            sendErrorMessage(sock, "Failed to write file ");
+        }
+        fclose(file);
+
+        /**
+         * return {"return":0, "compileUUID:}
+         */
         char *compileUUID = "123123123123123"; // todo remove hardcoded value and provide implementation
         cJSON *resultJSON = cJSON_CreateObject();
-        cJSON_AddItemToObject(resultJSON, "state", cJSON_CreateString("finished_ok")); // todo remove hardcoded value and provide implementation
+        cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
         cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
         resultJSONtext = cJSON_Print(resultJSON);
         cJSON_Delete(resultJSON);
-    } else if (strncmp(command, "pull", 4) == 0 ) {
+    } else if (strncmp(action, "pull", 4) == 0 ) {
         //  pull file (to receive file from CK node)
-        printf("[DEBUG INFO]: Get pull command");
+        printf("[DEBUG INFO]: Get pull action");
         cJSON* params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
         char* runUUID = cJSON_GetObjectItem(params, "runUUID")->valuestring;
 
@@ -202,13 +282,14 @@ void doProcessing(int sock) {
         // 3) convert to JSON and send to client
 
         cJSON *resultJSON = cJSON_CreateObject();
+        cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
         cJSON_AddItemToObject(resultJSON, "filename", cJSON_CreateString("file1")); // todo remove hardcoded value and provide implementation
         cJSON_AddItemToObject(resultJSON, "data", cJSON_CreateString("sdffffffffffffffffffffffffffff4533333333333333333333333333333333"));
         resultJSONtext = cJSON_Print(resultJSON);
         cJSON_Delete(resultJSON);
-    } else if (strncmp(command, "run", 4) == 0 ) {
+    } else if (strncmp(action, "run", 4) == 0 ) {
         //  shell (to execute a binary at CK node)
-        printf("[DEBUG INFO]: Get shell command");
+        printf("[DEBUG INFO]: Get shell action");
         // todo implement:
         // 1) find local file by provided name - send JSON error if not found
         // 2) generate run ID
@@ -217,11 +298,11 @@ void doProcessing(int sock) {
         // 4) in async process convert to JSON with ru UID and send to client
 
         cJSON *resultJSON = cJSON_CreateObject();
-        cJSON_AddItemToObject(resultJSON, "state", cJSON_CreateString("in progress")); // todo remove hardcoded value and provide implementation
+        cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
         cJSON_AddItemToObject(resultJSON, "runUUID", cJSON_CreateString("12312312323213")); // todo remove hardcoded value and provide implementation
         resultJSONtext = cJSON_Print(resultJSON);
         cJSON_Delete(resultJSON);
-    } else if (strncmp(command, "state", 4) == 0 ) {
+    } else if (strncmp(action, "state", 4) == 0 ) {
         printf("[DEBUG INFO]: Check run state by runUUID ");
         cJSON* params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
         char* runUUID = cJSON_GetObjectItem(params, "runUUID")->valuestring;
@@ -230,26 +311,43 @@ void doProcessing(int sock) {
         //todo implement get actual runing state by runUUID
 
         cJSON *resultJSON = cJSON_CreateObject();
-        cJSON_AddItemToObject(resultJSON, "state", cJSON_CreateString("finished_ok")); // todo remove hardcoded value and provide implementation
+        cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
         resultJSONtext = cJSON_Print(resultJSON);
         cJSON_Delete(resultJSON);
-    } else if (strncmp(command, "clear", 4) == 0 ) {
+    } else if (strncmp(action, "clear", 4) == 0 ) {
         printf("[DEBUG INFO]: Clearing tmp files ...");
         // todo implement removing all temporary files saved localy but need check some process could be in running state
         // so need to discus how it should work
-    } else if (strncmp(command, "shutdown", 4) == 0 ) {
+    } else if (strncmp(action, "shutdown", 4) == 0 ) {
         printf("[DEBUG INFO]: Shutdown CK node");
         cJSON_Delete(commandJSON);
         return ;
     } else {
-        perror("ERROR unknown command");
+        sendErrorMessage(sock, "unknown action");
     }
-    n = write(sock , resultJSONtext , strlen(resultJSONtext));
+    int n = write(sock, resultJSONtext, strlen(resultJSONtext));
+    free(resultJSONtext);
 
     if (n < 0) {
         perror("ERROR writing to socket");
-        exit(1);
+        return ;
     }
-
     cJSON_Delete(commandJSON);
+    free(client_message);
+}
+
+void sendErrorMessage(int sock, char * errorMessage) {
+    perror(errorMessage);
+
+    cJSON *resultJSON = cJSON_CreateObject();
+    cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("1"));
+    cJSON_AddItemToObject(resultJSON, "error", cJSON_CreateString(errorMessage));
+    char * resultJSONtext = cJSON_Print(resultJSON);
+    int n = write(sock , resultJSONtext , strlen(resultJSONtext));
+    cJSON_Delete(resultJSON);
+    free(resultJSONtext);
+    if (n < 0) {
+        perror("ERROR writing to socket");
+        return ;
+    }
 }
