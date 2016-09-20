@@ -336,7 +336,6 @@ void doProcessing(int sock, char *baseDir) {
         printf("[DEBUG INFO]: File content: %s\n", file_content);
 
         // 2) save locally at tmp dir
-//        char *baseDir = DEFAULT_BASE_DIR;//todo move to configuration
         char *filePath = concat(baseDir, fileName);
 
         FILE *file=fopen(filePath, "wb");
@@ -347,7 +346,6 @@ void doProcessing(int sock, char *baseDir) {
         }
         fclose(file);
         free(file_content);
-        free(file_content_base64);
         printf("[DEBUG INFO]: file saved to: %s\n", filePath);
 
         /**
@@ -404,7 +402,6 @@ void doProcessing(int sock, char *baseDir) {
         resultJSONtext = cJSON_Print(resultJSON);
         printf("[DEBUG INFO]: Pull response: %s\n", resultJSONtext);
         cJSON_Delete(resultJSON);
-        free(encodedContent);
     } else if (strncmp(action, "run", 3) == 0 ) {
         //  shell (to execute a binary at CK node)
         printf("[DEBUG INFO]: Get shell action");
