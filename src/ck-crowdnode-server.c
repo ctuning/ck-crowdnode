@@ -295,7 +295,7 @@ void doProcessing(int sock) {
             return;
         }
 
-        char* fileName = filenameJSON->valuestring;
+        char *fileName = filenameJSON->valuestring;
         cJSON *fileContentJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_CONTENT);
         if (!fileContentJSON) {
             printf("[ERROR]: Invalid action JSON format for message: \n");
@@ -304,17 +304,19 @@ void doProcessing(int sock) {
             return;
         }
 
-        char* file_content_base64 = fileContentJSON->valuestring;
+        char *file_content_base64 = fileContentJSON->valuestring;
 
         printf("[DEBUG INFO]: File name: %s\n", fileName);
         printf("[DEBUG INFO]: Data: %s\n", file_content_base64);
 
         char *file_content = malloc(Base64decode_len(file_content_base64));
-        int bytesDecoded = Base64decode(file_content , file_content_base64);
-        if (bytesDecoded == 0) {
-            sendErrorMessage(sock, "Failed to Base64 decode file");
+        if (strlen(file_content) != 0) {
+            int bytesDecoded = Base64decode(file_content, file_content_base64);
+            if (bytesDecoded == 0) {
+                sendErrorMessage(sock, "Failed to Base64 decode file");
+            }
+            printf("[DEBUG INFO]: bytesDecoded: %i\n", bytesDecoded);
         }
-        printf("[DEBUG INFO]: bytesDecoded: %i\n", bytesDecoded);
 
         // 2) save locally at tmp dir
         char *filePath = "/tmp/test.bin"; //todo move to configuration
