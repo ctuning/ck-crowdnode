@@ -310,13 +310,17 @@ void doProcessing(int sock) {
         printf("[DEBUG INFO]: Data: %s\n", file_content_base64);
 
         char *file_content = malloc(Base64decode_len(file_content_base64));
-        if (strlen(file_content) != 0) {
+        if (strlen(file_content_base64) != 0) {
             int bytesDecoded = Base64decode(file_content, file_content_base64);
             if (bytesDecoded == 0) {
                 sendErrorMessage(sock, "Failed to Base64 decode file");
             }
             printf("[DEBUG INFO]: bytesDecoded: %i\n", bytesDecoded);
+        } else {
+            printf("[WARNING]: file content is empty nothing to decode\n");
         }
+
+        printf("[DEBUG INFO]: File content: %s\n", file_content);
 
         // 2) save locally at tmp dir
         char *filePath = "/tmp/test.bin"; //todo move to configuration
@@ -327,6 +331,8 @@ void doProcessing(int sock) {
             sendErrorMessage(sock, "Failed to write file ");
         }
         fclose(file);
+        free(file_content);
+        free(file_content_base64);
         printf("[DEBUG INFO]: file saved to: %s\n", filePath);
 
         /**
@@ -337,26 +343,49 @@ void doProcessing(int sock) {
         cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
         cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
         resultJSONtext = cJSON_Print(resultJSON);
+        printf("[DEBUG INFO]: Push response: %s\n", resultJSONtext);
         cJSON_Delete(resultJSON);
     } else if (strncmp(action, "pull", 4) == 0 ) {
         //  pull file (to receive file from CK node)
-        printf("[DEBUG INFO]: Get pull action");
-        cJSON* params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
-        char* runUUID = cJSON_GetObjectItem(params, "runUUID")->valuestring;
+        cJSON *filenameJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_NAME);
+        if (!filenameJSON) {
+            printf("[ERROR]: Invalid action JSON format for provided message\n");
+            //todo check if need to cJSON_Delete(commandJSON) here as well
+            sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found");
+            return;
+        }
 
-        printf("[DEBUG INFO]: runUUID: %s\n", runUUID);
+        char *fileName = filenameJSON->valuestring;
+        char *filePath = "/tmp/test.bin"; //todo move to configuration
+        FILE *file=fopen(filePath, "rb");
 
-        // todo implement:
-        // 1) find local file by provided name
-        // 2) encode file to send
-        // 3) convert to JSON and send to client
+        fseek(file, 0, SEEK_END);
+        long fsize = ftell(file);
+        fseek(file, 0, SEEK_SET);
 
+        char *fileContent = malloc(fsize + 1);
+        memset(fileContent,fsize + 1,0);
+        fread(fileContent, fsize, 1, file);
+        fclose(file);
+
+        fileContent[fsize] = 0;
+        printf("[DEBUG INFO]: File size: %i\n", fsize);
+        printf("[DEBUG INFO]: File content: %s\n", fileContent);
+
+        char *encodedContent = malloc(Base64encode_len(fsize) + 1);
+        if (fsize > 0) {
+            int encodedSize = Base64encode(encodedContent, fileContent, fsize);
+            printf("[DEBUG INFO]: bytes Encoded: %i\n", encodedSize);
+        }
+                
         cJSON *resultJSON = cJSON_CreateObject();
         cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-        cJSON_AddItemToObject(resultJSON, "filename", cJSON_CreateString("file1")); // todo remove hardcoded value and provide implementation
-        cJSON_AddItemToObject(resultJSON, "data", cJSON_CreateString("sdffffffffffffffffffffffffffff4533333333333333333333333333333333"));
+        cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_NAME, cJSON_CreateString(fileName));
+        cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_CONTENT, cJSON_CreateString(encodedContent));
         resultJSONtext = cJSON_Print(resultJSON);
+        printf("[DEBUG INFO]: Pull response: %s\n", resultJSONtext);
         cJSON_Delete(resultJSON);
+        free(encodedContent);
     } else if (strncmp(action, "run", 3) == 0 ) {
         //  shell (to execute a binary at CK node)
         printf("[DEBUG INFO]: Get shell action");
