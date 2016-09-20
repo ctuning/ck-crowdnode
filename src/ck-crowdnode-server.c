@@ -313,17 +313,19 @@ void doProcessing(int sock) {
         int bytesDecoded = Base64decode(file_content , file_content_base64);
         if (bytesDecoded == 0) {
             sendErrorMessage(sock, "Failed to Base64 decode file");
-        }   
+        }
         printf("[DEBUG INFO]: bytesDecoded: %i\n", bytesDecoded);
 
         // 2) save locally at tmp dir
-        FILE *file=fopen("/tmp/dividiti/test.bin","wb");
+        char *filePath = "/tmp/test.bin"; //todo move to configuration
+        FILE *file=fopen(filePath, "wb");
 
         int results = fputs(file_content, file);
         if (results == EOF) {
             sendErrorMessage(sock, "Failed to write file ");
         }
         fclose(file);
+        printf("[DEBUG INFO]: file saved to: %s\n", filePath);
 
         /**
          * return {"return":0, "compileUUID:}
@@ -353,7 +355,7 @@ void doProcessing(int sock) {
         cJSON_AddItemToObject(resultJSON, "data", cJSON_CreateString("sdffffffffffffffffffffffffffff4533333333333333333333333333333333"));
         resultJSONtext = cJSON_Print(resultJSON);
         cJSON_Delete(resultJSON);
-    } else if (strncmp(action, "run", 4) == 0 ) {
+    } else if (strncmp(action, "run", 3) == 0 ) {
         //  shell (to execute a binary at CK node)
         printf("[DEBUG INFO]: Get shell action");
         // todo implement:
