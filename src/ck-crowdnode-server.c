@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__APPLE__)
     #include <unistd.h>
     #include <arpa/inet.h>
     #include <sys/socket.h> /* socket, connect */
@@ -33,6 +33,7 @@
     void doProcessingWin (struct thread_win_params* twp);
 
     #pragma comment(lib,"ws2_32.lib") //Winsock Library
+
 #else
 #endif
 
