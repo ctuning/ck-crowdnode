@@ -119,7 +119,8 @@ void sendErrorMessage(int sock, char * errorMessage) {
 
 int main( int argc, char *argv[] ) {
 
-    int sockfd, newsockfd,  clilen;
+    int sockfd, newsockfd;
+    socklen_t clilen;
     int portno =DEFAULT_SERVER_PORT;
     unsigned long win_thread_id;
 
@@ -129,7 +130,6 @@ int main( int argc, char *argv[] ) {
 #endif
 
     struct sockaddr_in serv_addr, cli_addr;
-    int pid;
 
     if (argc == 1) {
         portno = DEFAULT_SERVER_PORT;
@@ -189,7 +189,7 @@ int main( int argc, char *argv[] ) {
 
         closesocket(sockfd);
 #else
-        pid = fork();
+        pid_t pid = fork();
 
         if (pid < 0) {
             perror("ERROR on fork");
