@@ -28,6 +28,7 @@
     struct thread_win_params {
       int sock; 
       int newsock;
+      char * baseDir;
     };
 
     void doProcessingWin (struct thread_win_params* twp);
@@ -55,6 +56,8 @@ static char *const JSON_PARAM_FILE_CONTENT = "file_content_base64";
 static const int MAX_BUFFER_SIZE = 1024;
 static const int DEFAULT_SERVER_PORT = 3333;
 
+
+static char *const DEFAULT_BASE_DIR = "/tmp/";
 
 /**
  * Input: command in CK JSON format TDB
@@ -99,7 +102,7 @@ static const int DEFAULT_SERVER_PORT = 3333;
  * 2) Check/Implement concurrent execution
  */
 
-void doProcessing(int sock);
+void doProcessing(int sock, char *baseDir);
 
 void sendErrorMessage(int sock, char * errorMessage) {
     perror(errorMessage);
@@ -121,7 +124,8 @@ int main( int argc, char *argv[] ) {
 
     int sockfd, newsockfd;
     socklen_t clilen;
-    int portno =DEFAULT_SERVER_PORT;
+    int portno = DEFAULT_SERVER_PORT;
+    char *baseDir = DEFAULT_BASE_DIR;
     unsigned long win_thread_id;
 
 #ifdef _WIN32
@@ -138,6 +142,7 @@ int main( int argc, char *argv[] ) {
         portno = atol(argv[2]);
     } else if (argc > 2)  {
         printf("USAGE: %s [serverport] \n", argv[0]);
+        //todo pass baseDir as param
         exit(1);
     }
 
@@ -198,7 +203,7 @@ int main( int argc, char *argv[] ) {
 
         if (pid == 0) {
             close(sockfd);
-            doProcessing(newsockfd);
+            doProcessing(newsockfd, baseDir);
             exit(0);
         } else {
             close(newsockfd);
@@ -212,9 +217,10 @@ void doProcessingWin (struct thread_win_params* ptwp)
 {
     int sockfd=ptwp->sock;
     int newsockfd=ptwp->newsock;
+    char *baseDir = ptwp->baseDir;
 
     // Child process - talk with connected client
-    doProcessing (newsockfd);
+    doProcessing (newsockfd, baseDir);
 
     if (shutdown (newsockfd, 2)!=0)
     {
@@ -228,7 +234,14 @@ void doProcessingWin (struct thread_win_params* ptwp)
 }
 #endif
 
-void doProcessing(int sock) {
+char * concat(char *str1, char *str2) {
+    char *message = malloc (sizeof(str1) + strlen(str2) + 1);
+    strcpy (message, str1);
+    strcat (message, str2);
+    return message;
+}
+
+void doProcessing(int sock, char *baseDir) {
     char *client_message = malloc(MAX_BUFFER_SIZE);
     char *buffer = malloc(MAX_BUFFER_SIZE);
     memset(buffer, MAX_BUFFER_SIZE, 0);
@@ -323,7 +336,9 @@ void doProcessing(int sock) {
         printf("[DEBUG INFO]: File content: %s\n", file_content);
 
         // 2) save locally at tmp dir
-        char *filePath = "/tmp/test.bin"; //todo move to configuration
+//        char *baseDir = DEFAULT_BASE_DIR;//todo move to configuration
+        char *filePath = concat(baseDir, fileName);
+
         FILE *file=fopen(filePath, "wb");
 
         int results = fputs(file_content, file);
@@ -356,8 +371,12 @@ void doProcessing(int sock) {
         }
 
         char *fileName = filenameJSON->valuestring;
-        char *filePath = "/tmp/test.bin"; //todo move to configuration
+        char *filePath = concat(baseDir, fileName);
         FILE *file=fopen(filePath, "rb");
+        if (!file) {
+            sendErrorMessage(sock, concat("File not found at path:", filePath));
+            return;
+        }
 
         fseek(file, 0, SEEK_END);
         long fsize = ftell(file);
@@ -369,7 +388,7 @@ void doProcessing(int sock) {
         fclose(file);
 
         fileContent[fsize] = 0;
-        printf("[DEBUG INFO]: File size: %i\n", fsize);
+        printf("[DEBUG INFO]: File size: %lu\n", fsize);
         printf("[DEBUG INFO]: File content: %s\n", fileContent);
 
         char *encodedContent = malloc(Base64encode_len(fsize) + 1);
