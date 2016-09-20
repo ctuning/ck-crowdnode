@@ -137,7 +137,7 @@ int main( int argc, char *argv[] ) {
     } else if (argc == 2) {
         portno = atol(argv[2]);
     } else if (argc > 2)  {
-        printf("USAGE: %s [serverport]  %i\n", argv[0]);
+        printf("USAGE: %s [serverport] \n", argv[0]);
         exit(1);
     }
 
@@ -230,7 +230,7 @@ void doProcessingWin (struct thread_win_params* ptwp)
 
 void doProcessing(int sock) {
     char *client_message = malloc(MAX_BUFFER_SIZE);
-    char buffer = malloc(MAX_BUFFER_SIZE);
+    char *buffer = malloc(MAX_BUFFER_SIZE);
     memset(buffer, MAX_BUFFER_SIZE, 0);
     memset(client_message, MAX_BUFFER_SIZE, 0);
     int buffer_read = 0;
@@ -240,7 +240,7 @@ void doProcessing(int sock) {
     while(1) {
         buffer_read = read(sock, buffer, MAX_BUFFER_SIZE);
         if (buffer_read > 0) {
-            realloc(client_message, total_read + buffer_read);
+            client_message = realloc(client_message, total_read + buffer_read);
             memcpy(client_message + total_read, buffer, buffer_read);
             memset(buffer, MAX_BUFFER_SIZE, 0);
             total_read = total_read + buffer_read;
@@ -289,7 +289,7 @@ void doProcessing(int sock) {
         //  push file (to send file to CK Node )
         cJSON *filenameJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_NAME);
         if (!filenameJSON) {
-            printf("[ERROR]: Invalid action JSON format for message: %s\n");
+            printf("[ERROR]: Invalid action JSON format for provided message\n");
             //todo check if need to cJSON_Delete(commandJSON) here as well
             sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found");
             return;
