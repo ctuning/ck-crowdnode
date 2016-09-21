@@ -251,6 +251,7 @@ void doProcessing(int sock, char *baseDir) {
 
     //buffered read from socket
     while(1) {
+        printf("xyz\n");
         buffer_read = read(sock, buffer, MAX_BUFFER_SIZE);
         if (buffer_read > 0) {
             client_message = realloc(client_message, total_read + buffer_read);
@@ -320,7 +321,7 @@ void doProcessing(int sock, char *baseDir) {
         char *file_content_base64 = fileContentJSON->valuestring;
 
         printf("[DEBUG INFO]: File name: %s\n", fileName);
-        printf("[DEBUG INFO]: Data: %s\n", file_content_base64);
+        printf("[DEBUG INFO]: Data length: %lu\n", (unsigned long) strlen(file_content_base64));
 
         char *file_content = malloc(Base64decode_len(file_content_base64));
         if (strlen(file_content_base64) != 0) {
