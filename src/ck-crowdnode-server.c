@@ -296,7 +296,7 @@ void doProcessing(int sock, char *baseDir) {
         return;
     }
     char *action = actionJSON->valuestring;
-    printf("[DEBUG INFO]: Get action: %s\n", action);
+    printf("[INFO]: Get action: %s\n", action);
     char *resultJSONtext;
     if (strncmp(action, JSCON_PARAM_VALUE_PUSH, 4) == 0 ) {
         //  push file (to send file to CK Node )
@@ -348,7 +348,7 @@ void doProcessing(int sock, char *baseDir) {
         }
         fclose(file);
         free(file_content);
-            printf("[INFO]: File saved to: %s\n", filePath);
+        printf("[INFO]: File saved to: %s\n", filePath);
 
         /**
          * return {"return":0, "compileUUID:}
@@ -387,7 +387,7 @@ void doProcessing(int sock, char *baseDir) {
         fclose(file);
 
         fileContent[fsize] = 0;
-        printf("[DEBUG INFO]: File size: %lu\n", fsize);
+        printf("[DEBUG]: File size: %lu\n", fsize);
 
         unsigned long targetSize = (unsigned long)((fsize) * 4 / 3 + 5);
         printf("[DEBUG]: Target encoded size: %i\n", targetSize);
@@ -417,10 +417,10 @@ void doProcessing(int sock, char *baseDir) {
         resultJSONtext = cJSON_Print(resultJSON);
         cJSON_Delete(resultJSON);
     } else if (strncmp(action, "state", 4) == 0 ) {
-        printf("[DEBUG INFO]: Check run state by runUUID ");
+        printf("[DEBUG]: Check run state by runUUID ");
         cJSON* params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
         char* runUUID = cJSON_GetObjectItem(params, "runUUID")->valuestring;
-        printf("[DEBUG INFO]: runUUID: %s\n", runUUID);
+        printf("[DEBUG]: runUUID: %s\n", runUUID);
 
         //todo implement get actual runing state by runUUID
 
@@ -433,7 +433,7 @@ void doProcessing(int sock, char *baseDir) {
         // todo implement removing all temporary files saved localy but need check some process could be in running state
         // so need to discus how it should work
     } else if (strncmp(action, "shutdown", 4) == 0 ) {
-        printf("[DEBUG INFO]: Shutdown CK node");
+        printf("[DEBUG]: Start shutdown CK node");
         cJSON_Delete(commandJSON);
         return ;
     } else {
