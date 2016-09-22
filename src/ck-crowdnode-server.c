@@ -120,6 +120,13 @@ void sendErrorMessage(int sock, char * errorMessage) {
     }
 }
 
+char * concat(char *str1, char *str2) {
+    char *message = malloc (sizeof(str1) + strlen(str2) + 1);
+    strcpy (message, str1);
+    strcat (message, str2);
+    return message;
+}
+
 int main( int argc, char *argv[] ) {
 
     int sockfd, newsockfd;
@@ -137,7 +144,6 @@ int main( int argc, char *argv[] ) {
 
     if (argc == 1) {
         portno = DEFAULT_SERVER_PORT;
-        printf("[INFO]: Default server port  %i\n", DEFAULT_SERVER_PORT);
     } else if (argc == 2) {
         portno = atol(argv[2]);
     } else if (argc > 2)  {
@@ -163,6 +169,7 @@ int main( int argc, char *argv[] ) {
         perror("ERROR on binding");
         exit(1);
     }
+    printf("[INFO]: Server started at port  %i\n", portno);
 
     listen(sockfd,5);
     clilen = sizeof(cli_addr);
@@ -234,13 +241,6 @@ void doProcessingWin (struct thread_win_params* ptwp)
 }
 #endif
 
-char * concat(char *str1, char *str2) {
-    char *message = malloc (sizeof(str1) + strlen(str2) + 1);
-    strcpy (message, str1);
-    strcat (message, str2);
-    return message;
-}
-
 void doProcessing(int sock, char *baseDir) {
     char *client_message = malloc(MAX_BUFFER_SIZE);
     char *buffer = malloc(MAX_BUFFER_SIZE);
@@ -251,7 +251,6 @@ void doProcessing(int sock, char *baseDir) {
 
     //buffered read from socket
     while(1) {
-        printf("xyz\n");
         buffer_read = read(sock, buffer, MAX_BUFFER_SIZE);
         if (buffer_read > 0) {
             client_message = realloc(client_message, total_read + buffer_read);
@@ -269,6 +268,7 @@ void doProcessing(int sock, char *baseDir) {
             break;
         }
     }
+    printf("[DEBUG]: Post request length: %lu\n", (unsigned long) strlen(client_message));
 
     char *decodedJSON;
     char *encodedJSONPostData = strstr(client_message, CK_JSON_KEY);
@@ -279,7 +279,6 @@ void doProcessing(int sock, char *baseDir) {
         decodedJSON = client_message;
     }
 
-    printf("[DEBUG INFO]: decodedJSON message: %s\n", decodedJSON);
     cJSON *commandJSON = cJSON_Parse(decodedJSON);
     if (!commandJSON) {
         printf("[ERROR]: Invalid action JSON format for message: \n");
@@ -320,34 +319,36 @@ void doProcessing(int sock, char *baseDir) {
 
         char *file_content_base64 = fileContentJSON->valuestring;
 
-        printf("[DEBUG INFO]: File name: %s\n", fileName);
-        printf("[DEBUG INFO]: Data length: %lu\n", (unsigned long) strlen(file_content_base64));
+        printf("[DEBUG]: File name: %s\n", fileName);
+        printf("[DEBUG]: File content base64 length: %lu\n", (unsigned long) strlen(file_content_base64));
 
-        char *file_content = malloc(Base64decode_len(file_content_base64));
+        int targetSize = ((unsigned long) strlen(file_content_base64) + 1) * 4 / 3;
+        unsigned char *file_content = malloc(targetSize);
+
+        int bytesDecoded = 0;
         if (strlen(file_content_base64) != 0) {
-            int bytesDecoded = Base64decode(file_content, file_content_base64);
+            bytesDecoded = base64_decode(file_content_base64, file_content, targetSize);
             if (bytesDecoded == 0) {
                 sendErrorMessage(sock, "Failed to Base64 decode file");
             }
-            printf("[DEBUG INFO]: bytesDecoded: %i\n", bytesDecoded);
+            printf("[INFO]: Bytes decoded: %i\n", bytesDecoded);
         } else {
             printf("[WARNING]: file content is empty nothing to decode\n");
         }
-
-        printf("[DEBUG INFO]: File content: %s\n", file_content);
 
         // 2) save locally at tmp dir
         char *filePath = concat(baseDir, fileName);
 
         FILE *file=fopen(filePath, "wb");
-
-        int results = fputs(file_content, file);
+        printf("[DEBUG]: Open file to write %s\n", filePath);
+        printf("[DEBUG]: Bytes to write %i\n", bytesDecoded);
+        int results = fwrite(file_content, 1, bytesDecoded, file);
         if (results == EOF) {
             sendErrorMessage(sock, "Failed to write file ");
         }
         fclose(file);
         free(file_content);
-        printf("[DEBUG INFO]: file saved to: %s\n", filePath);
+            printf("[INFO]: File saved to: %s\n", filePath);
 
         /**
          * return {"return":0, "compileUUID:}
@@ -357,7 +358,6 @@ void doProcessing(int sock, char *baseDir) {
         cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
         cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
         resultJSONtext = cJSON_Print(resultJSON);
-        printf("[DEBUG INFO]: Push response: %s\n", resultJSONtext);
         cJSON_Delete(resultJSON);
     } else if (strncmp(action, "pull", 4) == 0 ) {
         //  pull file (to receive file from CK node)
@@ -388,12 +388,12 @@ void doProcessing(int sock, char *baseDir) {
 
         fileContent[fsize] = 0;
         printf("[DEBUG INFO]: File size: %lu\n", fsize);
-        printf("[DEBUG INFO]: File content: %s\n", fileContent);
 
-        char *encodedContent = malloc(Base64encode_len(fsize) + 1);
+        unsigned long targetSize = (unsigned long)((fsize) * 4 / 3 + 5);
+        printf("[DEBUG]: Target encoded size: %i\n", targetSize);
+        char *encodedContent = malloc(targetSize);
         if (fsize > 0) {
-            int encodedSize = Base64encode(encodedContent, fileContent, fsize);
-            printf("[DEBUG INFO]: bytes Encoded: %i\n", encodedSize);
+            base64_encode(fileContent, fsize, encodedContent, targetSize);
         }
                 
         cJSON *resultJSON = cJSON_CreateObject();
@@ -401,11 +401,9 @@ void doProcessing(int sock, char *baseDir) {
         cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_NAME, cJSON_CreateString(fileName));
         cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_CONTENT, cJSON_CreateString(encodedContent));
         resultJSONtext = cJSON_Print(resultJSON);
-        printf("[DEBUG INFO]: Pull response: %s\n", resultJSONtext);
         cJSON_Delete(resultJSON);
-    } else if (strncmp(action, "run", 3) == 0 ) {
+    } else if (strncmp(action, "shell", 4) == 0 ) {
         //  shell (to execute a binary at CK node)
-        printf("[DEBUG INFO]: Get shell action");
         // todo implement:
         // 1) find local file by provided name - send JSON error if not found
         // 2) generate run ID
@@ -431,7 +429,7 @@ void doProcessing(int sock, char *baseDir) {
         resultJSONtext = cJSON_Print(resultJSON);
         cJSON_Delete(resultJSON);
     } else if (strncmp(action, "clear", 4) == 0 ) {
-        printf("[DEBUG INFO]: Clearing tmp files ...");
+        printf("[DEBUG]: Clearing tmp files ...");
         // todo implement removing all temporary files saved localy but need check some process could be in running state
         // so need to discus how it should work
     } else if (strncmp(action, "shutdown", 4) == 0 ) {
@@ -450,4 +448,6 @@ void doProcessing(int sock, char *baseDir) {
     }
     cJSON_Delete(commandJSON);
     free(client_message);
+    printf("[INFO]: Action completed successfuly");
 }
+

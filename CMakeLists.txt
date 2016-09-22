@@ -7,8 +7,8 @@ set(SRC
         src/base64.c
         src/cJSON.h
         src/cJSON.c
-        src/ck-crowdnode-server.c
-        src/base64.c src/base64.h src/urldecoder.c)
+        src/urldecoder.c
+        src/ck-crowdnode-server.c)
 
 add_executable(ck-crowdnode-server ${SRC})
 target_link_libraries(ck-crowdnode-server m)
