@@ -173,10 +173,6 @@ size_t base64_decode(char *source, unsigned char *target, size_t targetlen) {
 
     /* convert as long as we get a full result */
     while (tmplen == 3) {
-        if (converted == 117) {
-            printf("here will be error now");
-        }
-//        quadruple[0] = '\0';
         /* get 4 characters to convert */
         for (i=0; i<4; i++) {
             /* skip invalid characters - we won't reach the end */
