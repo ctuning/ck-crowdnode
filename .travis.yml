@@ -1,5 +1,5 @@
 language: c
-script: cmake .
+script: ./_compile.sh
 compiler:
     - clang
     - gcc
