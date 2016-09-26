@@ -1,5 +1,5 @@
 language: c
-script: ./_compile.sh
+script: "./_compile.sh && ./run_tests.sh"
 compiler:
     - clang
     - gcc
