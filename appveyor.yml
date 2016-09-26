@@ -9,4 +9,4 @@ build_script:
     - cd build
     - cmake ..
     - ls C:/projects/ck-crowdnode/build
-    - msbuild /p:Configuration=Release /p:Platform=Win32 C:/projects/ck-crowdnode/build/Project.sln
+    - msbuild C:/projects/ck-crowdnode/build/Project.sln
