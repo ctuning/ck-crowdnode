@@ -1,0 +1,5 @@
+language: c
+script: ./_compile.sh
+compiler:
+    - clang
+    - gcc

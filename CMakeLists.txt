@@ -16,7 +16,7 @@ set(SRC
 add_executable(ck-crowdnode-server ${SRC})
 
 IF(WIN32)
-    target_link_libraries(ck-crowdnode-server ws2_32 m)
+    target_link_libraries(ck-crowdnode-server ws2_32)
 ELSE(WIN32)
-    target_link_libraries(ck-crowdnode-server  m)
+    target_link_libraries(ck-crowdnode-server m)
 ENDIF(WIN32)
