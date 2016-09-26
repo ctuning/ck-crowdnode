@@ -11,24 +11,7 @@ set(SRC
         src/cJSON.c
         src/urldecoder.c
         src/ck-crowdnode-server.c
-
-
-#        src/libuuid/uuid.h
-#        src/libuuid/clear.c
-#        src/libuuid/compare.c
-#        src/libuuid/copy.c
-#        src/libuuid/gen_uuid.c
-#        src/libuuid/isnull.c
-#        src/libuuid/pack.c
-#        src/libuuid/parse.c
-#        src/libuuid/test_uuid.c
-#        src/libuuid/unpack.c
-#        src/libuuid/unparse.c
-#        src/libuuid/uuid_time.c
-#        src/libuuid/uuidd.h
-#        src/libuuid/uuidP.h
-
-        src/net_uuid.c src/net_uuid.h)
+        )
 
 add_executable(ck-crowdnode-server ${SRC})
 

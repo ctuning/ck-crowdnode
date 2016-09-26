@@ -107,8 +107,8 @@ char* WSAGetLastError() {
  *
  *
  * todo list:
- * 1) Check compile and run on Windows as well
- * 2) Check/Implement concurrent execution
+ * 2) Check/Implement concurrent execution - looks like thread fors well at linus and windows as well
+ * 3) Implement "shell' commnad
  */
 
 void doProcessing(int sock, char *baseDir);
@@ -191,8 +191,9 @@ int main( int argc, char *argv[] ) {
     }
 
     /* Create socket for incoming connections */
-    if ((servSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0)
+    if ((servSock = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
         dieWithError("socket() failed");
+    }
 
     /* Construct local address structure */
     memset(&echoServAddr, 0, sizeof(echoServAddr));   /* Zero out structure */
@@ -201,12 +202,14 @@ int main( int argc, char *argv[] ) {
     echoServAddr.sin_port = htons(echoServPort);      /* Local port */
 
     /* Bind to the local address */
-    if (bind(servSock, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) < 0)
+    if (bind(servSock, (struct sockaddr *) &echoServAddr, sizeof(echoServAddr)) < 0) {
         dieWithError("bind() failed");
+    }
 
     /* Mark the socket so it will listen for incoming connections */
-    if (listen(servSock, MAXPENDING) < 0)
+    if (listen(servSock, MAXPENDING) < 0) {
         dieWithError("listen() failed");
+    }
 
 #else
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -348,8 +351,6 @@ void doProcessing(int sock, char *baseDir) {
             printf("Next %i part of buffer\n", i);
             i++;
         } else if (buffer_read < 0) {
-            /* close file and delete it, since data is not complete
-▐               report error, or whatever */
             perror("[ERROR]: reading from socket");
             printf("WSAGetLastError() %s\n", WSAGetLastError()); //win
             exit(1);
@@ -454,7 +455,8 @@ void doProcessing(int sock, char *baseDir) {
 		printf("[INFO]: File saved to: %s\n", filePath);
 
 		/**
-         * return {"return":0, "compileUUID:}
+         * return successful response message, example:
+         *   {"return":0, "compileUUID": <generated UID>}
          */
         char compileUUID[38];
         get_uuid_string(compileUUID,sizeof(compileUUID));
@@ -502,7 +504,11 @@ void doProcessing(int sock, char *baseDir) {
 			base64_encode(fileContent, fsize, encodedContent, targetSize);
 		}
 
-		cJSON *resultJSON = cJSON_CreateObject();
+        /**
+         * return successful response message, example:
+         *   {"return":0, "filename": <file name from requies>, "file_content_base64":<base 64 encoded requested file content>}
+         */
+        cJSON *resultJSON = cJSON_CreateObject();
 		cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
 		cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_NAME, cJSON_CreateString(fileName));
 		cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_CONTENT, cJSON_CreateString(encodedContent));
@@ -523,7 +529,7 @@ void doProcessing(int sock, char *baseDir) {
         char shellUUID[38];
         get_uuid_string(shellUUID,sizeof(shellUUID));
 
-        cJSON_AddItemToObject(resultJSON, "runUUID", cJSON_CreateString(shellUUID)); // todo remove hardcoded value and provide implementation
+        cJSON_AddItemToObject(resultJSON, "runUUID", cJSON_CreateString(shellUUID)); 
 		resultJSONtext = cJSON_Print(resultJSON);
 		cJSON_Delete(resultJSON);
 	} else if (strncmp(action, "state", 4) == 0 ) {
