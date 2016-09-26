@@ -12,7 +12,7 @@ die() {
 
 cd tests
 rm -rf ck-master
-unzip ck-master.zip
+git clone git@github.com:ctuning/ck.git ck-master
 export PATH=$PWD/ck-master/bin:$PATH
 
 ck add repo:remote-ck-node --url=http://localhost:3333 --remote --quiet
