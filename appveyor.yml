@@ -2,6 +2,9 @@
 platform:
     - x86
 
+configuration:
+    - Release
+
 build:
 
 build_script: 
