@@ -29,8 +29,6 @@
 #include <string.h>
 #include <fcntl.h>
 #include <stdint.h>
-#include <sys/time.h>
-#include <unistd.h>
 
 #if defined(HAVE_UNISTD_H)
 #include <unistd.h>
@@ -44,10 +42,11 @@
    resolution of your system's clock */
 #define UUIDS_PER_TICK 1024
 
-#ifdef WIN32
+#ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN 1
 #include <windows.h>
 #include "stdint.h"
+#include <time.h>
 #define snprintf _snprintf
 #else
 
@@ -59,8 +58,12 @@
 # endif
 #endif
 
-#if HAVE_SYS_TIME_H
-#include <sys/time.h>
+#ifdef __MINGW32__
+# include <sys/time.h>
+#else
+# if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# endif
 #endif
 
 #if HAVE_SYS_SYSINFO_H
@@ -73,7 +76,7 @@
    100ns ticks since UUID epoch, but resolution may be less than
    100ns. */
 
-#ifdef WIN32
+#ifdef _WIN32
 #define I64(C) C
 #else
 #define I64(C) C##LL
@@ -87,7 +90,7 @@ static uint16_t true_random(void);
 
 
 
-#ifdef WIN32
+#ifdef _WIN32
 
 static void get_system_time(uuid_time_t *uuid_time)
 {

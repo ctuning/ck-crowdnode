@@ -266,7 +266,7 @@ int main( int argc, char *argv[] ) {
 			exit(1);
 		}
 
-		closesocket(sockfd);
+/*		closesocket(sockfd); */
 #else
 
         newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
