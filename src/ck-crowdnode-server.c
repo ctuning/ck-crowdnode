@@ -42,6 +42,7 @@
 #include "cJSON.h"
 #include "base64.h"
 #include "urldecoder.h"
+#include "net_uuid.h"
 
 static char *const CK_JSON_KEY = "ck_json=";
 
@@ -321,7 +322,6 @@ void doProcessing(int sock, char *baseDir) {
         exit(1);
     }
 
-    char *tmp_message ;
     char *buffer = malloc(MAX_BUFFER_SIZE + 1);
     if (buffer == NULL) {
         perror("Error ! Memory not allocated buffer");
@@ -342,7 +342,6 @@ void doProcessing(int sock, char *baseDir) {
                 perror("Error ! Memory not allocated client_message");
                 exit(1);
             }
-            tmp_message = client_message;
             buffer[buffer_read] = '\0';
             memcpy(client_message + total_read, buffer, buffer_read);
             total_read = total_read + buffer_read;
@@ -457,7 +456,9 @@ void doProcessing(int sock, char *baseDir) {
 		/**
          * return {"return":0, "compileUUID:}
          */
-		char *compileUUID = "123123123123123"; // todo remove hardcoded value and provide implementation
+        char compileUUID[38];
+        get_uuid_string(compileUUID,sizeof(compileUUID));
+
 		cJSON *resultJSON = cJSON_CreateObject();
 		cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
 		cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
@@ -518,7 +519,11 @@ void doProcessing(int sock, char *baseDir) {
 
 		cJSON *resultJSON = cJSON_CreateObject();
 		cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-		cJSON_AddItemToObject(resultJSON, "runUUID", cJSON_CreateString("12312312323213")); // todo remove hardcoded value and provide implementation
+
+        char shellUUID[38];
+        get_uuid_string(shellUUID,sizeof(shellUUID));
+
+        cJSON_AddItemToObject(resultJSON, "runUUID", cJSON_CreateString(shellUUID)); // todo remove hardcoded value and provide implementation
 		resultJSONtext = cJSON_Print(resultJSON);
 		cJSON_Delete(resultJSON);
 	} else if (strncmp(action, "state", 4) == 0 ) {
