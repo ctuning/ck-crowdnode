@@ -1,10 +1,4 @@
 
-platform:
-    - x86
-
-configuration:
-    - Release
-
 build:
 
 build_script: 
@@ -12,4 +6,4 @@ build_script:
     - cd build
     - cmake ..
     - ls C:/projects/ck-crowdnode/build
-    - msbuild C:/projects/ck-crowdnode/build/Project.sln
+    - msbuild /p:Configuration=Release /p:Platform=Win32 C:/projects/ck-crowdnode/build/Project.sln
