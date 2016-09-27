@@ -1,5 +1,7 @@
 #!/bin/sh
 
+# The test assumes 'remote-ck-node' repository is specified
+
 tmp_file=ck-push-test.zip
 cp ck-master.zip $tmp_file
 
