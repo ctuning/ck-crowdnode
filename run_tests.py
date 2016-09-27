@@ -7,6 +7,7 @@ import os
 import sys
 import unittest
 import time
+import platform
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(script_dir)
@@ -21,7 +22,10 @@ def die(retcode):
         node_process.kill()
     exit(retcode)
 
-node_process = subprocess.Popen(['build/ck-crowdnode-server'])
+if 'Windows' == platform.system():
+    node_process = subprocess.Popen(['Release/ck-crowdnode-server.exe'])
+else:
+    node_process = subprocess.Popen(['build/ck-crowdnode-server'])
 
 shutil.rmtree(ck_dir, ignore_errors=True)
 r = subprocess.call('git clone https://github.com/ctuning/ck.git ' + ck_dir, shell=True)
@@ -38,9 +42,9 @@ r = ck.access({'remote': 'yes', 'module_uoa': 'repo', 'url': 'http://localhost:3
 tests_dir = os.path.join(script_dir, 'tests')
 
 class CkTestLoader(unittest.TestLoader):
-  def loadTestsFromModule(self, module, pattern=None):
-      module.ck = ck
-      return unittest.TestLoader.loadTestsFromModule(self, module, pattern)
+    def loadTestsFromModule(self, module, pattern=None):
+        module.ck = ck
+        return unittest.TestLoader.loadTestsFromModule(self, module, pattern)
 
 suite = CkTestLoader().discover(tests_dir, pattern='test_*.py')
 
