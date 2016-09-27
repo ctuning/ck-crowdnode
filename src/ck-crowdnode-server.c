@@ -51,6 +51,7 @@ static char *const JSON_PARAM_PARAMS = "parameters";
 static char *const JSCON_PARAM_VALUE_PUSH = "push";
 static char *const JSON_PARAM_FILE_NAME = "filename";
 static char *const JSON_PARAM_FILE_CONTENT = "file_content_base64";
+static char *const JSON_PARAM_SHELL_COMMAND = "cmd";
 
 /**
  * todo move out to config /etc/ck-crowdnode/ck-crowdnode.properties
@@ -780,14 +781,34 @@ void doProcessing(int sock, char *baseDir) {
             // 3) fork new process for async execute
             // 3) return run UUID as JSON sync with run UID and send to client
             // 4) in async process convert to JSON with ru UID and send to client
+            printf("[DEBUG]: Request for shell command %s\n", decodedJSON);
+
+            cJSON *shellCommandJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_SHELL_COMMAND);
+            if (!shellCommandJSON) {
+                printf("[ERROR]: Invalid action JSON format for provided message\n");
+                //todo check if need to cJSON_Delete(commandJSON) here as well
+                sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
+                return;
+            }
+
+            char *shellCommand = shellCommandJSON->valuestring;
+
+            if (!shellCommand) {
+                printf("[ERROR]: Invalid action JSON format for provided message\n");
+                //todo check if need to cJSON_Delete(commandJSON) here as well
+                sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
+                return;
+            }
+
+            int systemReturnCode = system(shellCommand);
 
             cJSON *resultJSON = cJSON_CreateObject();
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
 
-            char shellUUID[38];
-            get_uuid_string(shellUUID, sizeof(shellUUID));
+            cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
-            cJSON_AddItemToObject(resultJSON, "runUUID", cJSON_CreateString(shellUUID));
+            cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString("some program std out"));  //todo get std out
+            cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString("some program stderr"));   //todo get stderr
             resultJSONtext = cJSON_Print(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "state", 4) == 0) {
