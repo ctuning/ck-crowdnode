@@ -7,6 +7,7 @@ import os
 import sys
 import unittest
 import time
+import platform
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(script_dir)
@@ -21,7 +22,13 @@ def die(retcode):
         node_process.kill()
     exit(retcode)
 
-node_process = subprocess.Popen(['build/ck-crowdnode-server'])
+node_env = os.environ.copy()
+if 'Windows' == platform.system():
+    node_env['LOCALAPPDATA'] = script_dir
+else:
+    node_env['HOME'] = script_dir
+
+node_process = subprocess.Popen(['build/ck-crowdnode-server'], env=node_env)
 
 shutil.rmtree(ck_dir, ignore_errors=True)
 r = subprocess.call('git clone https://github.com/ctuning/ck.git ' + ck_dir, shell=True)
