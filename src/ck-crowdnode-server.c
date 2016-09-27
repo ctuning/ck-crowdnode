@@ -671,6 +671,16 @@ void doProcessing(int sock, char *baseDir) {
             char *filePath = concat(baseDir, fileName);
 
             FILE *file = fopen(filePath, "wb");
+            if (!file) {
+                char *message = concat("Could not write file at path: ", filePath);
+                printf("[ERROR]: %s", message);
+                if (commandJSON != NULL) {
+                    cJSON_Delete(commandJSON);
+                }
+                sendErrorMessage(sock, message, ERROR_CODE);
+                return;
+            }
+
             printf("[DEBUG]: Open file to write %s\n", filePath);
             printf("[DEBUG]: Bytes to write %i\n", bytesDecoded);
             int results = fwrite(file_content, 1, bytesDecoded, file);
@@ -714,6 +724,12 @@ void doProcessing(int sock, char *baseDir) {
             FILE *file = fopen(filePath, "rb");
             if (!file) {
                 char *message = concat("File not found at path:", filePath);
+                printf("[ERROR]: %s", message);
+
+                if (commandJSON != NULL) {
+                    cJSON_Delete(commandJSON);
+                }
+
                 sendErrorMessage(sock, message, ERROR_CODE);
                 return;
             }
