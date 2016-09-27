@@ -13,4 +13,4 @@ build_script:
     - ls Release
     - cp Release/ck-crowdnode-server.exe .
     - cd ..
-    - %PYTHON%/python.exe -m run_tests.py
+    - "%PYTHON%/python.exe -m run_tests.py"
