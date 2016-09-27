@@ -1,5 +1,5 @@
 language: c
-script: "./_compile.sh && ./run_tests.sh"
+script: "./_compile.sh && python -m run_tests.py"
 compiler:
     - clang
     - gcc
