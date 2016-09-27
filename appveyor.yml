@@ -7,4 +7,4 @@ build_script:
     - cmake ..
     - msbuild /p:Configuration=Release /p:Platform=Win32 C:/projects/ck-crowdnode/build/Project.sln
     - ls C:/projects/ck-crowdnode/build
-    - ls .
+    - ls Release
