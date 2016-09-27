@@ -9,8 +9,19 @@ import unittest
 import time
 import platform
 
+def safe_remove(fname):
+    try:
+        os.remove(fname)
+    except Exception:
+        pass
+
 script_dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(script_dir)
+
+config_dir = os.path.join(script_dir, '.ck-crowdnode')
+config_file = os.path.join(config_dir, 'ck-crowdnode-config.json')
+config_file_sample_windows = os.path.join(config_dir, 'ck-crowdnode-config.json.windows.sample')
+config_file_sample_linux = os.path.join(config_dir, 'ck-crowdnode-config.json.linux.sample')
 
 node_process=None
 ck_dir='tests-ck-master'
@@ -18,15 +29,19 @@ ck_dir='tests-ck-master'
 def die(retcode):
     os.chdir(script_dir)
     shutil.rmtree(ck_dir, ignore_errors=True)
+    safe_remove(config_file)
     if node_process is not None:
         node_process.kill()
     exit(retcode)
 
+safe_remove(config_file)
 node_env = os.environ.copy()
 if 'Windows' == platform.system():
     node_env['LOCALAPPDATA'] = script_dir
+    shutil.copyfile(config_file_sample_windows, config_file)
 else:
     node_env['HOME'] = script_dir
+    shutil.copyfile(config_file_sample_linux, config_file)
 
 node_process = subprocess.Popen(['build/ck-crowdnode-server'], env=node_env)
 
