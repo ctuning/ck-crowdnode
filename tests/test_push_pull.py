@@ -14,12 +14,12 @@ class TestPushPull(unittest.TestCase):
         orig_file = 'ck-master.zip'
         shutil.copyfile(orig_file, tmp_file)
         try:
-            r = ck.access({'cid': 'remote-ck-node::', 'action': 'push', 'filename': tmp_file})
+            r = ck.access({'cid': 'remote-ck-node::', 'action': 'push', 'filename': tmp_file, 'secretkey': secret_key})
             self.check(r)
 
             os.remove(tmp_file)
 
-            r = ck.access({'cid': 'remote-ck-node::', 'action': 'pull', 'filename': tmp_file})
+            r = ck.access({'cid': 'remote-ck-node::', 'action': 'pull', 'filename': tmp_file, 'secretkey': secret_key})
             self.check(r)
 
             # the downloaded file must match the original file

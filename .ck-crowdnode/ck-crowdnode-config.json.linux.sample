@@ -1,5 +1,5 @@
 {
 "port":3334,
 "path_to_files":"$HOME/ck-crowdnode",
-"secret_key":""
+"secret_key":"c4e239b4-8471-11e6-b24d-cbfef11692ca"
 }
