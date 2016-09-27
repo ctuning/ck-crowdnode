@@ -11,4 +11,6 @@ build_script:
     - msbuild /p:Configuration=Release /p:Platform=Win32 C:/projects/ck-crowdnode/build/Project.sln
     - ls C:/projects/ck-crowdnode/build
     - ls Release
-    - "%PYTHON%\\python.exe -m run_tests.py"
+    - cp Release/ck-crowdnode-server.exe .
+    - cd ..
+    - %PYTHON%/python.exe -m run_tests.py
