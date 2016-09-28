@@ -636,11 +636,7 @@ void doProcessing(int sock, char *baseDir) {
             printf("Next %i part of buffer\n", i);
             i++;
             if (-1 == message_len) {
-                //186953
                 message_len = detectMessageLength(buffer, total_read);
-                if (-1 != message_len) {
-                    printf("Got message length; %d", message_len);
-                }
             }
         } else if (buffer_read < 0) {
             perror("[ERROR]: reading from socket");
