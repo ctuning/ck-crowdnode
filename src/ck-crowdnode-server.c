@@ -148,8 +148,8 @@ int sockSendAll(int sock, const void* buf, size_t len) {
 
 int sendHttpResponse(int sock, int httpStatus, char* payload, int size) {
     // send HTTP headers
-    char buf[200];
-    int n = sprintf(buf, "HTTP/1.1 %d OK\r\nContent-Length: %d\r\n\r\n", httpStatus, size);
+    char buf[300];
+    int n = sprintf(buf, "HTTP/1.1 %d OK\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: %d\r\n\r\n", httpStatus, size);
     if (0 >= n) {
         perror("sprintf failed");
         return -1;
