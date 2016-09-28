@@ -23,12 +23,17 @@ config_file = os.path.join(config_dir, 'ck-crowdnode-config.json')
 config_file_sample_windows = os.path.join(config_dir, 'ck-crowdnode-config.json.windows.sample')
 config_file_sample_linux = os.path.join(config_dir, 'ck-crowdnode-config.json.linux.sample')
 
+files_dir = os.path.join(script_dir, 'ck-crowdnode-files')
+if not os.path.exists(files_dir):
+    os.makedirs(files_dir)
+
 node_process=None
 ck_dir='tests-ck-master'
 
 def die(retcode):
     os.chdir(script_dir)
     shutil.rmtree(ck_dir, ignore_errors=True)
+    shutil.rmtree(files_dir, ignore_errors=True)
     safe_remove(config_file)
     if node_process is not None:
         node_process.kill()

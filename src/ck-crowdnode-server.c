@@ -51,11 +51,12 @@ static char *const JSON_PARAM_PARAMS = "parameters";
 static char *const JSCON_PARAM_VALUE_PUSH = "push";
 static char *const JSON_PARAM_FILE_NAME = "filename";
 static char *const JSON_PARAM_FILE_CONTENT = "file_content_base64";
+static char *const JSON_PARAM_SHELL_COMMAND = "cmd";
 
 /**
  * todo move out to config /etc/ck-crowdnode/ck-crowdnode.properties
  */
-static const int MAX_BUFFER_SIZE = 1024;
+#define MAX_BUFFER_SIZE 1024
 static const int DEFAULT_SERVER_PORT = 3333;
 static const int MAXPENDING = 5;    /* Maximum outstanding connection requests */
 
@@ -74,8 +75,8 @@ static char *const DEFAULT_CONFIG_FILE_PATH = "$HOME/.ck-crowdnode/ck-crowdnode-
 static char *const HOME_DIR_TEMPLATE = "$HOME";
 static char *const HOME_DIR_ENV_KEY = "HOME";
 
-char* WSAGetLastError() {
-	return "";
+int WSAGetLastError() {
+	return 0;
 }
 #endif
 
@@ -124,6 +125,47 @@ char* WSAGetLastError() {
 
 void doProcessing(int sock, char *baseDir);
 
+int sockSend(int sock, const void* buf, size_t len) {
+#ifdef _WIN32
+    return send(sock, buf, len, 0);
+#else
+    return write(sock, buf, len);
+#endif
+}
+
+int sockSendAll(int sock, const void* buf, size_t len) {
+    const char* p = buf;
+    while (0 < len) {
+        int n = sockSend(sock, p, len);
+        if (0 >= n) {
+            return -1;
+        }
+        p += n;
+        len -= n;
+    }
+    return 0;
+}
+
+int sendHttpResponse(int sock, int httpStatus, char* payload, int size) {
+    // send HTTP headers
+    char buf[200];
+    int n = sprintf(buf, "HTTP/1.1 %d OK\r\nContent-Length: %d\r\n\r\n", httpStatus, size);
+    if (0 >= n) {
+        perror("sprintf failed");
+        return -1;
+    }
+    if (0 > sockSendAll(sock, buf, n)) {
+        perror("Failed to send HTTP response headers");
+        return -1;
+    }
+
+    // send payload
+    if (0 > sockSendAll(sock, payload, size)) {
+        perror("Failed to send HTTP response body");
+        return -1;
+    }
+}
+
 void sendErrorMessage(int sock, char * errorMessage, const char *errorCode) {
 	perror(errorMessage);
 
@@ -135,17 +177,12 @@ void sendErrorMessage(int sock, char * errorMessage, const char *errorCode) {
 
     cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString(errorCode));
 	cJSON_AddItemToObject(resultJSON, "error", cJSON_CreateString(errorMessage));
-	char *resultJSONtext = cJSON_Print(resultJSON);
+	char *resultJSONtext = cJSON_PrintUnformatted(resultJSON);
     if (!resultJSONtext) {
         perror("[ERROR]: resultJSONtext cannot be created");
         return;
     }
-#ifdef _WIN32
-    int n =send( sock, resultJSONtext, strlen(resultJSONtext), 0 );
-#else
-    int n = write(sock, resultJSONtext, strlen(resultJSONtext));
-#endif
-
+    int n = sendHttpResponse(sock, 500, resultJSONtext, strlen(resultJSONtext));
     if (n < 0) {
 		perror("ERROR writing to socket");
 		return ;
@@ -170,7 +207,7 @@ char* concat(const char *str1, const char *str2) {
 }
 
 void dieWithError(char *error) {
-    printf("Connection error: %s %s", error, WSAGetLastError());
+    printf("Connection error: %s %i", error, WSAGetLastError());
     exit(1);
 }
 
@@ -429,7 +466,7 @@ int main( int argc, char *argv[] , char** envp) {
 
 	if (sockfd < 0) {
 		perror("ERROR opening socket");
-        printf("WSAGetLastError() %s\n", WSAGetLastError()); //win
+        printf("WSAGetLastError() %i\n", WSAGetLastError()); //win
 		exit(1);
 	}
 
@@ -486,7 +523,7 @@ int main( int argc, char *argv[] , char** envp) {
 
 		if (newsockfd < 0) {
 			perror("ERROR on accept");
-            printf("WSAGetLastError() %s\n", WSAGetLastError()); //win
+            printf("WSAGetLastError() %i\n", WSAGetLastError()); //win
 			exit(1);
 		}
 		pid_t pid = fork();
@@ -607,7 +644,7 @@ void doProcessing(int sock, char *baseDir) {
             }
         } else if (buffer_read < 0) {
             perror("[ERROR]: reading from socket");
-            printf("WSAGetLastError() %s\n", WSAGetLastError()); //win
+            printf("WSAGetLastError() %i\n", WSAGetLastError()); //win
             exit(1);
         }
         if (buffer_read == 0 || total_read >= message_len || -2 == message_len) {
@@ -711,6 +748,16 @@ void doProcessing(int sock, char *baseDir) {
             char *filePath = concat(baseDir, fileName);
 
             FILE *file = fopen(filePath, "wb");
+            if (!file) {
+                char *message = concat("Could not write file at path: ", filePath);
+                printf("[ERROR]: %s", message);
+                if (commandJSON != NULL) {
+                    cJSON_Delete(commandJSON);
+                }
+                sendErrorMessage(sock, message, ERROR_CODE);
+                return;
+            }
+
             printf("[DEBUG]: Open file to write %s\n", filePath);
             printf("[DEBUG]: Bytes to write %i\n", bytesDecoded);
             int results = fwrite(file_content, 1, bytesDecoded, file);
@@ -736,7 +783,7 @@ void doProcessing(int sock, char *baseDir) {
             printf("[INFO]: resultJSON created\n");
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
             cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
-            resultJSONtext = cJSON_Print(resultJSON);
+            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "pull", 4) == 0) {
             //  pull file (to receive file from CK node)
@@ -754,6 +801,12 @@ void doProcessing(int sock, char *baseDir) {
             FILE *file = fopen(filePath, "rb");
             if (!file) {
                 char *message = concat("File not found at path:", filePath);
+                printf("[ERROR]: %s", message);
+
+                if (commandJSON != NULL) {
+                    cJSON_Delete(commandJSON);
+                }
+
                 sendErrorMessage(sock, message, ERROR_CODE);
                 return;
             }
@@ -794,7 +847,7 @@ void doProcessing(int sock, char *baseDir) {
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
             cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_NAME, cJSON_CreateString(fileName));
             cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_CONTENT, cJSON_CreateString(encodedContent));
-            resultJSONtext = cJSON_Print(resultJSON);
+            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "shell", 4) == 0) {
             //  shell (to execute a binary at CK node)
@@ -804,15 +857,79 @@ void doProcessing(int sock, char *baseDir) {
             // 3) fork new process for async execute
             // 3) return run UUID as JSON sync with run UID and send to client
             // 4) in async process convert to JSON with ru UID and send to client
+            printf("[DEBUG]: Request for shell command %s\n", decodedJSON);
+
+            cJSON *shellCommandJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_SHELL_COMMAND);
+            if (!shellCommandJSON) {
+                printf("[ERROR]: Invalid action JSON format for provided message\n");
+                //todo check if need to cJSON_Delete(commandJSON) here as well
+                sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
+                return;
+            }
+
+            char *shellCommand = shellCommandJSON->valuestring;
+
+            if (!shellCommand) {
+                printf("[ERROR]: Invalid action JSON format for provided message\n");
+                //todo check if need to cJSON_Delete(commandJSON) here as well
+                sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
+                return;
+            }
+
+            int systemReturnCode = system(shellCommand);
+
+            char path[MAX_BUFFER_SIZE + 1];
+            char *stdoutText = malloc(MAX_BUFFER_SIZE + 1);
+            if (stdoutText == NULL) {
+                perror("[ERROR]: Memory not allocated for stdoutText first time");
+                exit(1);
+            }
+            memset(stdoutText, 0, MAX_BUFFER_SIZE + 1);
+
+            /* Open the command for reading. */
+            FILE *fp;
+#ifdef _WIN32
+            fp = _popen(shellCommand, "r");
+#else
+            fp = popen(shellCommand, "r");
+#endif
+            if (fp == NULL) {
+                printf("[ERROR]: Failed to run command: %s\n", shellCommand);
+                exit(1);
+            }
+
+            int buffer_read = 0;
+            int total_read = 0;
+            while (fgets(path, sizeof(path) - 1, fp) != NULL) {
+                buffer_read = sizeof(path) - 1;
+                printf("[INFO]: Next buffer_read: %i\n", buffer_read);
+                printf("[INFO]: Next stdout line length: %lu, line text: %s", (unsigned long)(strlen(path)), path);
+                stdoutText = realloc(stdoutText, total_read + buffer_read + 1);
+                if (stdoutText == NULL) {
+                    perror("[ERROR]: Memory not allocated stdout");
+                    exit(1);
+                }
+                strcat(stdoutText + strlen(stdoutText), path);
+                total_read = total_read + buffer_read;
+            }
+
+#ifdef _WIN32
+            _pclose(fp);
+#else
+            pclose(fp);
+#endif
+
+            printf("[INFO]: total stdout line length: %i\n", total_read);
+            printf("[DEBUG]: stdout: %s\n", stdoutText);
 
             cJSON *resultJSON = cJSON_CreateObject();
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
 
-            char shellUUID[38];
-            get_uuid_string(shellUUID, sizeof(shellUUID));
+            cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
-            cJSON_AddItemToObject(resultJSON, "runUUID", cJSON_CreateString(shellUUID));
-            resultJSONtext = cJSON_Print(resultJSON);
+            cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(stdoutText)); 
+            cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString("some program stderr"));   //todo get stderr
+            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "state", 4) == 0) {
             printf("[DEBUG]: Check run state by runUUID ");
@@ -824,7 +941,7 @@ void doProcessing(int sock, char *baseDir) {
 
             cJSON *resultJSON = cJSON_CreateObject();
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-            resultJSONtext = cJSON_Print(resultJSON);
+            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "clear", 4) == 0) {
             printf("[DEBUG]: Clearing tmp files ...");
@@ -838,11 +955,7 @@ void doProcessing(int sock, char *baseDir) {
             sendErrorMessage(sock, "unknown action", ERROR_CODE);
         }
 
-#ifdef _WIN32
-        int n1 =send( sock, resultJSONtext, strlen(resultJSONtext), 0 );
-#else
-        int n1 = write(sock, resultJSONtext, strlen(resultJSONtext));
-#endif
+        int n1 = sendHttpResponse(sock, 200, resultJSONtext, strlen(resultJSONtext));
 
         free(resultJSONtext);
 

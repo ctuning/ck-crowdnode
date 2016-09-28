@@ -9,4 +9,4 @@ cd build
 
 cmake ..
 
-msbuild /p:Configuration=Release /p:Platform=Win32 CKNodeServer.sln
+msbuild /p:Configuration=Release /p:Platform=Win32 Project.sln

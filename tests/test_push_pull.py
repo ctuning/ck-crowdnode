@@ -25,5 +25,7 @@ class TestPushPull(unittest.TestCase):
             # the downloaded file must match the original file
             self.assertTrue(filecmp.cmp(orig_file, tmp_file))
         finally:
-            os.remove(tmp_file)
+            try:
+                os.remove(tmp_file)
+            except: pass
 
