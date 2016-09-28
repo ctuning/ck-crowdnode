@@ -1,3 +1,6 @@
+environment:
+    matrix:
+        - PYTHON: "C:\\Python27"
 
 build:
 
@@ -5,5 +8,9 @@ build_script:
     - mkdir build
     - cd build
     - cmake ..
-    - ls C:/projects/ck-crowdnode/build
     - msbuild /p:Configuration=Release /p:Platform=Win32 C:/projects/ck-crowdnode/build/Project.sln
+    - ls C:/projects/ck-crowdnode/build
+    - ls Release
+    - cp Release/ck-crowdnode-server.exe .
+    - cd ..
+    - "%PYTHON%/python.exe -m run_tests.py"
