@@ -529,7 +529,41 @@ void doProcessingWin (struct thread_win_params* ptwp)
 }
 #endif
 
+/**
+ * Tries to detect message length by the given buffer, which contains the beginning of the message.
+ * The buffer passed must be of at least (size+1) length.
+ * 
+ * Returns -1, if the length is still unknown (in this case the caller must provide a bigger part of the message).
+ * 
+ * Returns -2, if the length can never be determined, i.e. HTTP headers don't contain 'Content-Length'.
+ *
+ * If 0 or more is returned, it is the total size of the message (size of the headers + size of the body).
+ */
+int detectMessageLength(char* buf, int size) {
+    buf[size] = 0;
+    
+    // trying to find where headers end
+    char* s = strstr(buf, "\r\n\r\n");
+    int header_stop_len = 4;
+    if (NULL == s) {
+        s = strstr(buf, "\n\n");
+        header_stop_len = 2;
+    }
+    if (NULL == s) {
+        return -1;
+    }
+    const long header_len = (s - buf) + header_stop_len;
 
+    const char* content_len_key = "Content-Length:";
+    // trying to find Content-Length
+    char* content_len_header = strstr(buf, content_len_key);
+    if (NULL == content_len_header || (content_len_header - buf) >= header_len) {
+        return -2;
+    }
+
+    long l = strtol(content_len_header + strlen(content_len_key), NULL, 10);
+    return header_len + l;
+}
 
 void doProcessing(int sock, char *baseDir) {
     char *client_message = malloc(MAX_BUFFER_SIZE + 1);
@@ -547,6 +581,7 @@ void doProcessing(int sock, char *baseDir) {
     memset(buffer, 0, MAX_BUFFER_SIZE);
     int buffer_read = 0;
     int total_read = 0;
+    int message_len = -1;
 
     //buffered read from socket
     int i = 0;
@@ -563,12 +598,19 @@ void doProcessing(int sock, char *baseDir) {
             total_read = total_read + buffer_read;
             printf("Next %i part of buffer\n", i);
             i++;
+            if (-1 == message_len) {
+                //186953
+                message_len = detectMessageLength(buffer, total_read);
+                if (-1 != message_len) {
+                    printf("Got message length; %d", message_len);
+                }
+            }
         } else if (buffer_read < 0) {
             perror("[ERROR]: reading from socket");
             printf("WSAGetLastError() %s\n", WSAGetLastError()); //win
             exit(1);
         }
-        if (buffer_read == 0 || buffer_read < MAX_BUFFER_SIZE) {
+        if (buffer_read == 0 || total_read >= message_len || -2 == message_len) {
             /* message received successfully */
             break;
         }
@@ -606,10 +648,8 @@ void doProcessing(int sock, char *baseDir) {
         return;
     }
     char *clientSecretKey = secretkeyJSON->valuestring;
-    printf("[ERROR]: Get secretkey: %sfrom client\n", clientSecretKey);
+    printf("[DEBUG]: Got secretkey: %s from client\n", clientSecretKey);
     if (!serverSecretKey || strncmp(clientSecretKey, serverSecretKey, strlen(serverSecretKey)) == 0 ) {
-
-
         cJSON *actionJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_NAME_COMMAND);
         if (!actionJSON) {
             printf("[ERROR]: Invalid action JSON format for message: \n");
