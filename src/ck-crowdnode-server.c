@@ -607,7 +607,7 @@ void doProcessing(int sock, char *baseDir) {
         return;
     }
     char *clientSecretKey = secretkeyJSON->valuestring;
-    printf("[ERROR]: Get secretkey: %sfrom client\n", clientSecretKey);
+    printf("[ERROR]: Get secretkey: %s from client\n", clientSecretKey);
     if (!serverSecretKey || strncmp(clientSecretKey, serverSecretKey, strlen(serverSecretKey)) == 0 ) {
 
 
