@@ -56,7 +56,7 @@ static char *const JSON_PARAM_SHELL_COMMAND = "cmd";
 /**
  * todo move out to config /etc/ck-crowdnode/ck-crowdnode.properties
  */
-static const int MAX_BUFFER_SIZE = 1024;
+#define MAX_BUFFER_SIZE 1024
 static const int DEFAULT_SERVER_PORT = 3333;
 static const int MAXPENDING = 5;    /* Maximum outstanding connection requests */
 
@@ -75,8 +75,8 @@ static char *const DEFAULT_CONFIG_FILE_PATH = "$HOME/.ck-crowdnode/ck-crowdnode-
 static char *const HOME_DIR_TEMPLATE = "$HOME";
 static char *const HOME_DIR_ENV_KEY = "HOME";
 
-char* WSAGetLastError() {
-	return "";
+int WSAGetLastError() {
+	return 0;
 }
 #endif
 
@@ -171,7 +171,7 @@ char* concat(const char *str1, const char *str2) {
 }
 
 void dieWithError(char *error) {
-    printf("Connection error: %s %s", error, WSAGetLastError());
+    printf("Connection error: %s %i", error, WSAGetLastError());
     exit(1);
 }
 
@@ -430,7 +430,7 @@ int main( int argc, char *argv[] , char** envp) {
 
 	if (sockfd < 0) {
 		perror("ERROR opening socket");
-        printf("WSAGetLastError() %s\n", WSAGetLastError()); //win
+        printf("WSAGetLastError() %i\n", WSAGetLastError()); //win
 		exit(1);
 	}
 
@@ -487,7 +487,7 @@ int main( int argc, char *argv[] , char** envp) {
 
 		if (newsockfd < 0) {
 			perror("ERROR on accept");
-            printf("WSAGetLastError() %s\n", WSAGetLastError()); //win
+            printf("WSAGetLastError() %i\n", WSAGetLastError()); //win
 			exit(1);
 		}
 		pid_t pid = fork();
@@ -566,7 +566,7 @@ void doProcessing(int sock, char *baseDir) {
             i++;
         } else if (buffer_read < 0) {
             perror("[ERROR]: reading from socket");
-            printf("WSAGetLastError() %s\n", WSAGetLastError()); //win
+            printf("WSAGetLastError() %i\n", WSAGetLastError()); //win
             exit(1);
         }
         if (buffer_read == 0 || buffer_read < MAX_BUFFER_SIZE) {
@@ -812,7 +812,11 @@ void doProcessing(int sock, char *baseDir) {
 
             /* Open the command for reading. */
             FILE *fp;
+#ifdef _WIN32
+            fp = _popen(shellCommand, "r");
+#else
             fp = popen(shellCommand, "r");
+#endif
             if (fp == NULL) {
                 printf("[ERROR]: Failed to run command: %s\n", shellCommand);
                 exit(1);
@@ -822,8 +826,8 @@ void doProcessing(int sock, char *baseDir) {
             int total_read = 0;
             while (fgets(path, sizeof(path) - 1, fp) != NULL) {
                 buffer_read = sizeof(path) - 1;
-                printf("[INFO]: Next buffer_read: %lu\n", buffer_read);
-                printf("[INFO]: Next stdout line length: %lu, line text: %s", strlen(path), path);
+                printf("[INFO]: Next buffer_read: %i\n", buffer_read);
+                printf("[INFO]: Next stdout line length: %lu, line text: %s", (unsigned long)(strlen(path)), path);
                 stdoutText = realloc(stdoutText, total_read + buffer_read + 1);
                 if (stdoutText == NULL) {
                     perror("[ERROR]: Memory not allocated stdout");
@@ -832,8 +836,14 @@ void doProcessing(int sock, char *baseDir) {
                 strcat(stdoutText + strlen(stdoutText), path);
                 total_read = total_read + buffer_read;
             }
+
+#ifdef _WIN32
+            _pclose(fp);
+#else
             pclose(fp);
-            printf("[INFO]: total stdout line length: %lu\n", total_read);
+#endif
+
+            printf("[INFO]: total stdout line length: %i\n", total_read);
             printf("[DEBUG]: stdout: %s\n", stdoutText);
 
             cJSON *resultJSON = cJSON_CreateObject();
