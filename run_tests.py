@@ -68,6 +68,7 @@ class CkTestLoader(unittest.TestLoader):
     def loadTestsFromModule(self, module, pattern=None):
         module.ck = ck
         module.secret_key = 'c4e239b4-8471-11e6-b24d-cbfef11692ca'
+        module.platform = platform.system()
         return unittest.TestLoader.loadTestsFromModule(self, module, pattern)
 
 suite = CkTestLoader().discover(tests_dir, pattern='test_*.py')
