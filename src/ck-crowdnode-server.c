@@ -136,7 +136,7 @@ void sendErrorMessage(int sock, char * errorMessage, const char *errorCode) {
 
     cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString(errorCode));
 	cJSON_AddItemToObject(resultJSON, "error", cJSON_CreateString(errorMessage));
-	char *resultJSONtext = cJSON_Print(resultJSON);
+	char *resultJSONtext = cJSON_PrintUnformatted(resultJSON);
     if (!resultJSONtext) {
         perror("[ERROR]: resultJSONtext cannot be created");
         return;
@@ -707,7 +707,7 @@ void doProcessing(int sock, char *baseDir) {
             printf("[INFO]: resultJSON created\n");
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
             cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
-            resultJSONtext = cJSON_Print(resultJSON);
+            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "pull", 4) == 0) {
             //  pull file (to receive file from CK node)
@@ -771,7 +771,7 @@ void doProcessing(int sock, char *baseDir) {
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
             cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_NAME, cJSON_CreateString(fileName));
             cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_CONTENT, cJSON_CreateString(encodedContent));
-            resultJSONtext = cJSON_Print(resultJSON);
+            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "shell", 4) == 0) {
             //  shell (to execute a binary at CK node)
@@ -853,7 +853,7 @@ void doProcessing(int sock, char *baseDir) {
 
             cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(stdoutText)); 
             cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString("some program stderr"));   //todo get stderr
-            resultJSONtext = cJSON_Print(resultJSON);
+            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "state", 4) == 0) {
             printf("[DEBUG]: Check run state by runUUID ");
@@ -865,7 +865,7 @@ void doProcessing(int sock, char *baseDir) {
 
             cJSON *resultJSON = cJSON_CreateObject();
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-            resultJSONtext = cJSON_Print(resultJSON);
+            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "clear", 4) == 0) {
             printf("[DEBUG]: Clearing tmp files ...");
