@@ -802,12 +802,46 @@ void doProcessing(int sock, char *baseDir) {
 
             int systemReturnCode = system(shellCommand);
 
+            char path[MAX_BUFFER_SIZE + 1];
+            char *stdoutText = malloc(MAX_BUFFER_SIZE + 1);
+            if (stdoutText == NULL) {
+                perror("[ERROR]: Memory not allocated for stdoutText first time");
+                exit(1);
+            }
+            memset(stdoutText, 0, MAX_BUFFER_SIZE + 1);
+
+            /* Open the command for reading. */
+            FILE *fp;
+            fp = popen(shellCommand, "r");
+            if (fp == NULL) {
+                printf("[ERROR]: Failed to run command: %s\n", shellCommand);
+                exit(1);
+            }
+
+            int buffer_read = 0;
+            int total_read = 0;
+            while (fgets(path, sizeof(path) - 1, fp) != NULL) {
+                buffer_read = sizeof(path) - 1;
+                printf("[INFO]: Next buffer_read: %lu\n", buffer_read);
+                printf("[INFO]: Next stdout line length: %lu, line text: %s", strlen(path), path);
+                stdoutText = realloc(stdoutText, total_read + buffer_read + 1);
+                if (stdoutText == NULL) {
+                    perror("[ERROR]: Memory not allocated stdout");
+                    exit(1);
+                }
+                strcat(stdoutText + strlen(stdoutText), path);
+                total_read = total_read + buffer_read;
+            }
+            pclose(fp);
+            printf("[INFO]: total stdout line length: %lu\n", total_read);
+            printf("[DEBUG]: stdout: %s\n", stdoutText);
+
             cJSON *resultJSON = cJSON_CreateObject();
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
 
             cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
-            cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString("some program std out"));  //todo get std out
+            cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(stdoutText)); 
             cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString("some program stderr"));   //todo get stderr
             resultJSONtext = cJSON_Print(resultJSON);
             cJSON_Delete(resultJSON);
