@@ -458,9 +458,11 @@ int main( int argc, char *argv[] , char** envp) {
     }
 
     /* Print info - needed to configure CK by end-user */
+    printf("\n");
     printf("[INFO for CK client]: server port:          %i\n", ckCrowdnodeServerConfig->port);
     printf("[INFO for CK client]: server path to files: %s\n", ckCrowdnodeServerConfig->pathToFiles);
     printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);
+    printf("\n");
 
     createCKFilesDirectoryIfDoesnotExist(getAbsolutePath(ckCrowdnodeServerConfig->pathToFiles, envp));
 
@@ -815,7 +817,7 @@ void doProcessing(int sock, char *baseDir) {
             FILE *file = fopen(filePath, "wb");
             if (!file) {
                 char *message = concat("Could not write file at path: ", filePath);
-                printf("[ERROR]: %s", message);
+                printf("[ERROR]: %s\n", message);
                 if (commandJSON != NULL) {
                     cJSON_Delete(commandJSON);
                 }
@@ -837,9 +839,9 @@ void doProcessing(int sock, char *baseDir) {
              * return successful response message, example:
              *   {"return":0, "compileUUID": <generated UID>}
              */
-            char compileUUID[38];
+/*            char compileUUID[38];
             get_uuid_string(compileUUID, sizeof(compileUUID));
-
+*/
             cJSON *resultJSON = cJSON_CreateObject();
             if (!resultJSON) {
                 perror("[ERROR]: Memory not allocated for resultJSON");
@@ -847,7 +849,7 @@ void doProcessing(int sock, char *baseDir) {
             }
             printf("[INFO]: resultJSON created\n");
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-            cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
+/*            cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID)); */
             resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "pull", 4) == 0) {
