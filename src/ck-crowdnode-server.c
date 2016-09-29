@@ -52,6 +52,8 @@ static char *const JSON_PARAM_PARAMS = "parameters";
 static char *const JSCON_PARAM_VALUE_PUSH = "push";
 static char *const JSON_PARAM_FILE_NAME = "filename";
 static char *const JSON_PARAM_FILE_CONTENT = "file_content_base64";
+static char *const JSON_PARAM_EXTRA_PATH = "extra_path";
+
 static char *const JSON_PARAM_SHELL_COMMAND = "cmd";
 
 /**
@@ -371,8 +373,7 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
     return 1;
 }
 
-int createCKFilesDirectoryIfDoesnotExist(char * ckFilesDirectory, char** envp) {
-    char *dirPath = getAbsolutePath(ckFilesDirectory, envp);
+int createCKFilesDirectoryIfDoesnotExist(char * dirPath) {
     int createDirState = 0;
     printf("[INFO]: Check CK crowdnode server files directory: %s\n", dirPath);
     createDirState = mkdir(dirPath, DEFAULT_DIR_MODE);
@@ -462,7 +463,7 @@ int main( int argc, char *argv[] , char** envp) {
         );
     }
 
-    createCKFilesDirectoryIfDoesnotExist(ckCrowdnodeServerConfig->pathToFiles, envp);
+    createCKFilesDirectoryIfDoesnotExist(getAbsolutePath(ckCrowdnodeServerConfig->pathToFiles, envp));
 
     serverSecretKey = ckCrowdnodeServerConfig->secretKey;
     int sockfd, newsockfd;
@@ -766,8 +767,23 @@ void doProcessing(int sock, char *baseDir) {
                 sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
                 return;
             }
-
             char *fileName = filenameJSON->valuestring;
+            printf("[DEBUG]: File name: %s\n", fileName);
+
+            char *finalBaseDir = concat(baseDir,"/");
+
+            //  Optional param extra_path
+            cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
+            char *extraPath = "";
+            if (extraPathJSON) {
+                extraPath = extraPathJSON->valuestring;
+                printf("[INFO]: Extra path provided: %s\n", extraPath);
+
+                finalBaseDir = concat(finalBaseDir, extraPath);
+                finalBaseDir = concat(finalBaseDir, "/");
+                createCKFilesDirectoryIfDoesnotExist(finalBaseDir);
+            }
+
             cJSON *fileContentJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_CONTENT);
             if (!fileContentJSON) {
                 printf("[ERROR]: Invalid action JSON format for message: \n");
@@ -777,10 +793,7 @@ void doProcessing(int sock, char *baseDir) {
                 sendErrorMessage(sock, "Invalid action JSON format for message: no fileContentJSON found", ERROR_CODE);
                 return;
             }
-
             char *file_content_base64 = fileContentJSON->valuestring;
-
-            printf("[DEBUG]: File name: %s\n", fileName);
             printf("[DEBUG]: File content base64 length: %lu\n", (unsigned long) strlen(file_content_base64));
 
             int targetSize = ((unsigned long) strlen(file_content_base64) + 1) * 4 / 3;
@@ -798,9 +811,7 @@ void doProcessing(int sock, char *baseDir) {
                 printf("[WARNING]: file content is empty nothing to decode\n");
             }
 
-            // 2) save locally at tmp dir
-            printf("[DEBUG]: Build file path from base dir: %s and file name: %s\n", baseDir, fileName);
-            char *filePath = concat(baseDir, fileName);
+            char *filePath = concat(finalBaseDir,fileName);
 
             FILE *file = fopen(filePath, "wb");
             if (!file) {
@@ -851,7 +862,22 @@ void doProcessing(int sock, char *baseDir) {
             }
 
             char *fileName = filenameJSON->valuestring;
-            char *filePath = concat(baseDir, fileName);
+            printf("[DEBUG]: File name: %s\n", fileName);
+
+            char *finalBaseDir = concat(baseDir,"/");
+
+            //  Optional param extra_path
+            cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
+            char *extraPath = "";
+            if (extraPathJSON) {
+                extraPath = extraPathJSON->valuestring;
+                printf("[INFO]: Extra path provided: %s\n", extraPath);
+
+                finalBaseDir = concat(finalBaseDir, extraPath);
+                finalBaseDir = concat(finalBaseDir, "/");
+            }
+
+            char *filePath = concat(finalBaseDir, fileName);
             printf("[DEBUG]: Reading file: %s\n", filePath);
             FILE *file = fopen(filePath, "rb");
             if (!file) {
