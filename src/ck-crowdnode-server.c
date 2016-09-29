@@ -315,7 +315,7 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
 
     FILE *file=fopen(filePath, "rb");
     if (!file) {
-        printf("[ERROR]: File not found at path: %s\n", filePath);
+        printf("[WARN]: File not found at path: %s\n", filePath);
         return 0;
     }
 
@@ -452,18 +452,15 @@ int main( int argc, char *argv[] , char** envp) {
 
     if (!loadConfigFromFile(ckCrowdnodeServerConfig, envp)) {
         loadDefaultConfig(ckCrowdnodeServerConfig, envp);
-        printf("[WARN]: CK-crowdnode-server configuration file problem. Server will be started with default configuration, port: %i, pathToFiles: %s, secret_key: %s\n",
-               ckCrowdnodeServerConfig->port,
-               ckCrowdnodeServerConfig->pathToFiles,
-               ckCrowdnodeServerConfig->secretKey
-        );
+        printf("[WARN]: CK-crowdnode-server configuration file problem. Server will be started with default configuration\n");
     } else {
-        printf("[INFO]: CK-crowdnode-server configuration file loaded successfully with configuration, port: %i, pathToFiles: %s, secret_key: %s\n",
-               ckCrowdnodeServerConfig->port,
-               ckCrowdnodeServerConfig->pathToFiles,
-               ckCrowdnodeServerConfig->secretKey
-        );
+        printf("[INFO]: CK-crowdnode-server configuration file loaded successfully with configuration\n");
     }
+
+    /* Print info - needed to configure CK by end-user */
+    printf("[INFO for CK client]: server port:          %i\n", ckCrowdnodeServerConfig->port);
+    printf("[INFO for CK client]: server path to files: %s\n", ckCrowdnodeServerConfig->pathToFiles);
+    printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);
 
     createCKFilesDirectoryIfDoesnotExist(getAbsolutePath(ckCrowdnodeServerConfig->pathToFiles, envp));
 
