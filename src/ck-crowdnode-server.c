@@ -287,6 +287,7 @@ char *getEnvValue(char *param, char** envp ) {
             value = malloc(strlen(*envp) + 1);
             if (!value) {
                 perror("[ERROR]: Memory not allocated for getEnvValue");
+                return NULL;
             }
             strcpy(value, *envp);
             char *rep = concat(param, "=");
@@ -474,6 +475,7 @@ int main( int argc, char *argv[] , char** envp) {
 	char *baseDir = malloc(strlen(ckCrowdnodeServerConfig->pathToFiles) * sizeof(char) + 1);
     if (!baseDir) {
         perror("Could not allocate memory for baseDir");
+        exit(1);
     }
     strcpy(baseDir, ckCrowdnodeServerConfig->pathToFiles);
 	unsigned long win_thread_id;
@@ -664,6 +666,291 @@ int detectMessageLength(char* buf, int size) {
     return header_len + l;
 }
 
+void sendJson(int sock, cJSON* json) {
+    char* txt = cJSON_PrintUnformatted(json);
+    if (NULL == txt) {
+        perror("Failed to convert JSON to string");
+        exit(1);
+    }
+    int n1 = sendHttpResponse(sock, 200, txt, strlen(txt));
+    free(txt);
+    if (n1 < 0) {
+        perror("ERROR sending JSON to socket");
+    }
+}
+
+void processPush(int sock, char* baseDir, cJSON* commandJSON) {
+    //  push file (to send file to CK Node )
+    cJSON *filenameJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_NAME);
+    if (!filenameJSON) {
+        printf("[ERROR]: Invalid action JSON format for provided message\n");
+        sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
+        return;
+    }
+    char *fileName = filenameJSON->valuestring;
+    printf("[DEBUG]: File name: %s\n", fileName);
+
+    char *finalBaseDir = concat(baseDir,"/");
+
+    //  Optional param extra_path
+    cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
+    char *extraPath = "";
+    if (extraPathJSON) {
+        extraPath = extraPathJSON->valuestring;
+        printf("[INFO]: Extra path provided: %s\n", extraPath);
+
+        finalBaseDir = concat(finalBaseDir, extraPath);
+        finalBaseDir = concat(finalBaseDir, "/");
+        createCKFilesDirectoryIfDoesnotExist(finalBaseDir);
+    }
+
+    cJSON *fileContentJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_CONTENT);
+    if (!fileContentJSON) {
+        printf("[ERROR]: Invalid action JSON format for message: \n");
+        if (commandJSON != NULL) {
+            cJSON_Delete(commandJSON);
+        }
+        sendErrorMessage(sock, "Invalid action JSON format for message: no fileContentJSON found", ERROR_CODE);
+        return;
+    }
+    char *file_content_base64 = fileContentJSON->valuestring;
+    printf("[DEBUG]: File content base64 length: %lu\n", (unsigned long) strlen(file_content_base64));
+
+    int targetSize = ((unsigned long) strlen(file_content_base64) + 1) * 4 / 3;
+    unsigned char *file_content = malloc(targetSize);
+
+    int bytesDecoded = 0;
+    if (strlen(file_content_base64) != 0) {
+        bytesDecoded = base64_decode(file_content_base64, file_content, targetSize);
+        if (bytesDecoded == 0) {
+            sendErrorMessage(sock, "Failed to Base64 decode file", ERROR_CODE);
+        }
+        file_content[bytesDecoded] = '\0';
+        printf("[INFO]: Bytes decoded: %i\n", bytesDecoded);
+    } else {
+        printf("[WARNING]: file content is empty nothing to decode\n");
+    }
+
+    char *filePath = concat(finalBaseDir,fileName);
+
+    FILE *file = fopen(filePath, "wb");
+    if (!file) {
+        char *message = concat("Could not write file at path: ", filePath);
+        printf("[ERROR]: %s", message);
+        if (commandJSON != NULL) {
+            cJSON_Delete(commandJSON);
+        }
+        sendErrorMessage(sock, message, ERROR_CODE);
+        free(file_content);
+        return;
+    }
+
+    printf("[DEBUG]: Open file to write %s\n", filePath);
+    printf("[DEBUG]: Bytes to write %i\n", bytesDecoded);
+    int results = fwrite(file_content, 1, bytesDecoded, file);
+    if (results == EOF) {
+        sendErrorMessage(sock, "Failed to write file ", ERROR_CODE);
+    }
+    fclose(file);
+    free(file_content);
+    printf("[INFO]: File saved to: %s\n", filePath);
+
+    /**
+     * return successful response message, example:
+     *   {"return":0, "compileUUID": <generated UID>}
+     */
+    char compileUUID[38];
+    get_uuid_string(compileUUID, sizeof(compileUUID));
+
+    cJSON *resultJSON = cJSON_CreateObject();
+    if (!resultJSON) {
+        perror("[ERROR]: Memory not allocated for resultJSON");
+        exit(1);
+    }
+    printf("[INFO]: resultJSON created\n");
+    cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
+    cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
+    sendJson(sock, resultJSON);
+    cJSON_Delete(resultJSON);
+}
+
+void processPull(int sock, char* baseDir, cJSON* commandJSON) {
+    //  pull file (to receive file from CK node)
+    cJSON *filenameJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_NAME);
+    if (!filenameJSON) {
+        printf("[ERROR]: Invalid action JSON format for provided message\n");
+        sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
+        return;
+    }
+
+    char *fileName = filenameJSON->valuestring;
+    printf("[DEBUG]: File name: %s\n", fileName);
+
+    char *finalBaseDir = concat(baseDir,"/");
+
+    //  Optional param extra_path
+    cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
+    char *extraPath = "";
+    if (extraPathJSON) {
+        extraPath = extraPathJSON->valuestring;
+        printf("[INFO]: Extra path provided: %s\n", extraPath);
+
+        finalBaseDir = concat(finalBaseDir, extraPath);
+        finalBaseDir = concat(finalBaseDir, "/");
+    }
+
+    char *filePath = concat(finalBaseDir, fileName);
+    printf("[DEBUG]: Reading file: %s\n", filePath);
+    FILE *file = fopen(filePath, "rb");
+    if (!file) {
+        char *message = concat("File not found at path:", filePath);
+        printf("[ERROR]: %s", message);
+
+        if (commandJSON != NULL) {
+            cJSON_Delete(commandJSON);
+        }
+
+        sendErrorMessage(sock, message, ERROR_CODE);
+        return;
+    }
+
+    fseek(file, 0, SEEK_END);
+    long fsize = ftell(file);
+    fseek(file, 0, SEEK_SET);
+
+    unsigned char *fileContent = malloc(fsize + 1);
+    memset(fileContent, 0, fsize + 1);
+    fread(fileContent, fsize, 1, file);
+    fclose(file);
+
+    fileContent[fsize] = 0;
+    printf("[DEBUG]: File size: %lu\n", fsize);
+
+    unsigned long targetSize = (unsigned long) ((fsize) * 4 / 3 + 5);
+    printf("[DEBUG]: Target encoded size: %lu\n", targetSize);
+    char *encodedContent = malloc(targetSize);
+    if (!encodedContent) {
+        perror("[ERROR]: Memory not allocated for encodedContent");
+        exit(1);
+    }
+
+    if (fsize > 0) {
+        base64_encode(fileContent, fsize, encodedContent, targetSize);
+    }
+
+    /**
+     * return successful response message, example:
+     *   {"return":0, "filename": <file name from requies>, "file_content_base64":<base 64 encoded requested file content>}
+     */
+    cJSON *resultJSON = cJSON_CreateObject();
+    if (!resultJSON) {
+        perror("[ERROR]: Memory not allocated for resultJSON");
+        exit(1);
+    }
+    cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
+    cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_NAME, cJSON_CreateString(fileName));
+    cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_CONTENT, cJSON_CreateString(encodedContent));
+    sendJson(sock, resultJSON);
+    cJSON_Delete(resultJSON);
+    free(encodedContent);
+}
+
+void processShell(int sock, cJSON* commandJSON) {
+    //  shell (to execute a binary at CK node)
+    // todo implement:
+    // 1) find local file by provided name - send JSON error if not found
+    // 2) generate run ID
+    // 3) fork new process for async execute
+    // 3) return run UUID as JSON sync with run UID and send to client
+    // 4) in async process convert to JSON with ru UID and send to client
+
+    cJSON *shellCommandJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_SHELL_COMMAND);
+    if (!shellCommandJSON) {
+        printf("[ERROR]: Invalid action JSON format for provided message\n");
+        //todo check if need to cJSON_Delete(commandJSON) here as well
+        sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
+        return;
+    }
+
+    char *shellCommand = shellCommandJSON->valuestring;
+
+    if (!shellCommand) {
+        printf("[ERROR]: Invalid action JSON format for provided message\n");
+        //todo check if need to cJSON_Delete(commandJSON) here as well
+        sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
+        return;
+    }
+
+    int systemReturnCode = system(shellCommand);
+
+    char path[MAX_BUFFER_SIZE + 1];
+    unsigned char *stdoutText = malloc(MAX_BUFFER_SIZE + 1);
+    if (stdoutText == NULL) {
+        perror("[ERROR]: Memory not allocated for stdoutText first time");
+        exit(1);
+    }
+    memset(stdoutText, 0, MAX_BUFFER_SIZE + 1);
+
+    /* Open the command for reading. */
+    FILE *fp;
+#ifdef _WIN32
+    fp = _popen(shellCommand, "r");
+#else
+    fp = popen(shellCommand, "r");
+#endif
+    if (fp == NULL) {
+        printf("[ERROR]: Failed to run command: %s\n", shellCommand);
+        exit(1);
+    }
+
+    int totalRead = 0;
+    while (fgets(path, sizeof(path) - 1, fp) != NULL) {
+        unsigned long pathSize = (unsigned long)(strlen(path));
+        stdoutText = realloc(stdoutText, totalRead + pathSize + 1);
+        if (stdoutText == NULL) {
+            perror("[ERROR]: Memory not allocated stdout");
+            exit(1);
+        }
+        memcpy(stdoutText + totalRead, path, pathSize);
+        totalRead = totalRead + pathSize;
+    }
+
+#ifdef _WIN32
+    _pclose(fp);
+#else
+    pclose(fp);
+#endif
+
+    stdoutText[totalRead] ='\0';
+    printf("[INFO]: total stdout length: %i\n", totalRead);
+    printf("[DEBUG]: stdout: %s\n", stdoutText);
+
+    char *encodedContent = "";
+    if (totalRead > 0) {
+        unsigned long targetSize = (unsigned long) ((totalRead) * 4 / 3 + 5);
+        printf("[DEBUG]: Target stdout encoded size: %lu\n", targetSize);
+        encodedContent = malloc(targetSize);
+        if (!encodedContent) {
+            perror("[ERROR]: Memory not allocated for encoded stdout Content");
+            exit(1);
+        }
+        memset(encodedContent, 0, targetSize);
+        base64_encode(stdoutText, totalRead, encodedContent, targetSize);
+    }
+
+    free(stdoutText);
+
+    cJSON *resultJSON = cJSON_CreateObject();
+    cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
+
+    cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
+
+    cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(encodedContent));
+    cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(""));   //todo get stderr
+    sendJson(sock, resultJSON);
+    cJSON_Delete(resultJSON);
+}
+
 void doProcessing(int sock, char *baseDir) {
     char *client_message = malloc(MAX_BUFFER_SIZE + 1);
     if (client_message == NULL) {
@@ -759,272 +1046,11 @@ void doProcessing(int sock, char *baseDir) {
         printf("[INFO]: Get action: %s\n", action);
         char *resultJSONtext;
         if (strncmp(action, JSCON_PARAM_VALUE_PUSH, 4) == 0) {
-            //  push file (to send file to CK Node )
-            cJSON *filenameJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_NAME);
-            if (!filenameJSON) {
-                printf("[ERROR]: Invalid action JSON format for provided message\n");
-                if (commandJSON != NULL) {
-                    cJSON_Delete(commandJSON);
-                }
-                sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
-                return;
-            }
-            char *fileName = filenameJSON->valuestring;
-            printf("[DEBUG]: File name: %s\n", fileName);
-
-            char *finalBaseDir = concat(baseDir,"/");
-
-            //  Optional param extra_path
-            cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
-            char *extraPath = "";
-            if (extraPathJSON) {
-                extraPath = extraPathJSON->valuestring;
-                printf("[INFO]: Extra path provided: %s\n", extraPath);
-
-                finalBaseDir = concat(finalBaseDir, extraPath);
-                finalBaseDir = concat(finalBaseDir, "/");
-                createCKFilesDirectoryIfDoesnotExist(finalBaseDir);
-            }
-
-            cJSON *fileContentJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_CONTENT);
-            if (!fileContentJSON) {
-                printf("[ERROR]: Invalid action JSON format for message: \n");
-                if (commandJSON != NULL) {
-                    cJSON_Delete(commandJSON);
-                }
-                sendErrorMessage(sock, "Invalid action JSON format for message: no fileContentJSON found", ERROR_CODE);
-                return;
-            }
-            char *file_content_base64 = fileContentJSON->valuestring;
-            printf("[DEBUG]: File content base64 length: %lu\n", (unsigned long) strlen(file_content_base64));
-
-            int targetSize = ((unsigned long) strlen(file_content_base64) + 1) * 4 / 3;
-            unsigned char *file_content = malloc(targetSize);
-
-            int bytesDecoded = 0;
-            if (strlen(file_content_base64) != 0) {
-                bytesDecoded = base64_decode(file_content_base64, file_content, targetSize);
-                if (bytesDecoded == 0) {
-                    sendErrorMessage(sock, "Failed to Base64 decode file", ERROR_CODE);
-                }
-                file_content[bytesDecoded] = '\0';
-                printf("[INFO]: Bytes decoded: %i\n", bytesDecoded);
-            } else {
-                printf("[WARNING]: file content is empty nothing to decode\n");
-            }
-
-            char *filePath = concat(finalBaseDir,fileName);
-
-            FILE *file = fopen(filePath, "wb");
-            if (!file) {
-                char *message = concat("Could not write file at path: ", filePath);
-                printf("[ERROR]: %s", message);
-                if (commandJSON != NULL) {
-                    cJSON_Delete(commandJSON);
-                }
-                sendErrorMessage(sock, message, ERROR_CODE);
-                return;
-            }
-
-            printf("[DEBUG]: Open file to write %s\n", filePath);
-            printf("[DEBUG]: Bytes to write %i\n", bytesDecoded);
-            int results = fwrite(file_content, 1, bytesDecoded, file);
-            if (results == EOF) {
-                sendErrorMessage(sock, "Failed to write file ", ERROR_CODE);
-            }
-            fclose(file);
-            free(file_content);
-            printf("[INFO]: File saved to: %s\n", filePath);
-
-            /**
-             * return successful response message, example:
-             *   {"return":0, "compileUUID": <generated UID>}
-             */
-            char compileUUID[38];
-            get_uuid_string(compileUUID, sizeof(compileUUID));
-
-            cJSON *resultJSON = cJSON_CreateObject();
-            if (!resultJSON) {
-                perror("[ERROR]: Memory not allocated for resultJSON");
-                exit(1);
-            }
-            printf("[INFO]: resultJSON created\n");
-            cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-            cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
-            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
-            cJSON_Delete(resultJSON);
+            processPush(sock, baseDir, commandJSON);
         } else if (strncmp(action, "pull", 4) == 0) {
-            //  pull file (to receive file from CK node)
-            cJSON *filenameJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_NAME);
-            if (!filenameJSON) {
-                printf("[ERROR]: Invalid action JSON format for provided message\n");
-                //todo check if need to cJSON_Delete(commandJSON) here as well
-                sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
-                return;
-            }
-
-            char *fileName = filenameJSON->valuestring;
-            printf("[DEBUG]: File name: %s\n", fileName);
-
-            char *finalBaseDir = concat(baseDir,"/");
-
-            //  Optional param extra_path
-            cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
-            char *extraPath = "";
-            if (extraPathJSON) {
-                extraPath = extraPathJSON->valuestring;
-                printf("[INFO]: Extra path provided: %s\n", extraPath);
-
-                finalBaseDir = concat(finalBaseDir, extraPath);
-                finalBaseDir = concat(finalBaseDir, "/");
-            }
-
-            char *filePath = concat(finalBaseDir, fileName);
-            printf("[DEBUG]: Reading file: %s\n", filePath);
-            FILE *file = fopen(filePath, "rb");
-            if (!file) {
-                char *message = concat("File not found at path:", filePath);
-                printf("[ERROR]: %s", message);
-
-                if (commandJSON != NULL) {
-                    cJSON_Delete(commandJSON);
-                }
-
-                sendErrorMessage(sock, message, ERROR_CODE);
-                return;
-            }
-
-            fseek(file, 0, SEEK_END);
-            long fsize = ftell(file);
-            fseek(file, 0, SEEK_SET);
-
-            unsigned char *fileContent = malloc(fsize + 1);
-            memset(fileContent, 0, fsize + 1);
-            fread(fileContent, fsize, 1, file);
-            fclose(file);
-
-            fileContent[fsize] = 0;
-            printf("[DEBUG]: File size: %lu\n", fsize);
-
-            unsigned long targetSize = (unsigned long) ((fsize) * 4 / 3 + 5);
-            printf("[DEBUG]: Target encoded size: %lu\n", targetSize);
-            char *encodedContent = malloc(targetSize);
-            if (!encodedContent) {
-                perror("[ERROR]: Memory not allocated for encodedContent");
-                exit(1);
-            }
-
-            if (fsize > 0) {
-                base64_encode(fileContent, fsize, encodedContent, targetSize);
-            }
-
-            /**
-             * return successful response message, example:
-             *   {"return":0, "filename": <file name from requies>, "file_content_base64":<base 64 encoded requested file content>}
-             */
-            cJSON *resultJSON = cJSON_CreateObject();
-            if (!resultJSON) {
-                perror("[ERROR]: Memory not allocated for resultJSON");
-                exit(1);
-            }
-            cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-            cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_NAME, cJSON_CreateString(fileName));
-            cJSON_AddItemToObject(resultJSON, JSON_PARAM_FILE_CONTENT, cJSON_CreateString(encodedContent));
-            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
-            cJSON_Delete(resultJSON);
+            processPull(sock, baseDir, commandJSON);
         } else if (strncmp(action, "shell", 4) == 0) {
-            //  shell (to execute a binary at CK node)
-            // todo implement:
-            // 1) find local file by provided name - send JSON error if not found
-            // 2) generate run ID
-            // 3) fork new process for async execute
-            // 3) return run UUID as JSON sync with run UID and send to client
-            // 4) in async process convert to JSON with ru UID and send to client
-            printf("[DEBUG]: Request for shell command %s\n", decodedJSON);
-
-            cJSON *shellCommandJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_SHELL_COMMAND);
-            if (!shellCommandJSON) {
-                printf("[ERROR]: Invalid action JSON format for provided message\n");
-                //todo check if need to cJSON_Delete(commandJSON) here as well
-                sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
-                return;
-            }
-
-            char *shellCommand = shellCommandJSON->valuestring;
-
-            if (!shellCommand) {
-                printf("[ERROR]: Invalid action JSON format for provided message\n");
-                //todo check if need to cJSON_Delete(commandJSON) here as well
-                sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
-                return;
-            }
-
-            int systemReturnCode = system(shellCommand);
-
-            char path[MAX_BUFFER_SIZE + 1];
-            unsigned char *stdoutText = malloc(MAX_BUFFER_SIZE + 1);
-            if (stdoutText == NULL) {
-                perror("[ERROR]: Memory not allocated for stdoutText first time");
-                exit(1);
-            }
-            memset(stdoutText, 0, MAX_BUFFER_SIZE + 1);
-
-            /* Open the command for reading. */
-            FILE *fp;
-#ifdef _WIN32
-            fp = _popen(shellCommand, "r");
-#else
-            fp = popen(shellCommand, "r");
-#endif
-            if (fp == NULL) {
-                printf("[ERROR]: Failed to run command: %s\n", shellCommand);
-                exit(1);
-            }
-
-            int totalRead = 0;
-            while (fgets(path, sizeof(path) - 1, fp) != NULL) {
-                unsigned long pathSize = (unsigned long)(strlen(path));
-                stdoutText = realloc(stdoutText, totalRead + pathSize + 1);
-                if (stdoutText == NULL) {
-                    perror("[ERROR]: Memory not allocated stdout");
-                    exit(1);
-                }
-                memcpy(stdoutText + totalRead, path, pathSize);
-                totalRead = totalRead + pathSize;
-            }
-
-#ifdef _WIN32
-            _pclose(fp);
-#else
-            pclose(fp);
-#endif
-
-            stdoutText[totalRead] ='\0';
-            printf("[INFO]: total stdout length: %i\n", totalRead);
-            printf("[DEBUG]: stdout: %s\n", stdoutText);
-
-            char *encodedContent = "";
-            if (totalRead > 0) {
-                unsigned long targetSize = (unsigned long) ((totalRead) * 4 / 3 + 5);
-                printf("[DEBUG]: Target stdout encoded size: %lu\n", targetSize);
-                encodedContent = malloc(targetSize);
-                if (!encodedContent) {
-                    perror("[ERROR]: Memory not allocated for encoded stdout Content");
-                    exit(1);
-                }
-                memset(encodedContent, 0, targetSize);
-                base64_encode(stdoutText, totalRead, encodedContent, targetSize);
-            }
-
-            cJSON *resultJSON = cJSON_CreateObject();
-            cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-
-            cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
-
-            cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(encodedContent));
-            cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(""));   //todo get stderr
-            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
-            cJSON_Delete(resultJSON);
+            processShell(sock, commandJSON);
         } else if (strncmp(action, "state", 4) == 0) {
             printf("[DEBUG]: Check run state by runUUID ");
             cJSON *params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
@@ -1041,31 +1067,17 @@ void doProcessing(int sock, char *baseDir) {
             printf("[DEBUG]: Clearing tmp files ...");
             // todo implement removing all temporary files saved localy but need check some process could be in running state
             // so need to discus how it should work
+            sendHttpResponse(sock, 200, "", 0);
         } else if (strncmp(action, "shutdown", 4) == 0) {
             printf("[DEBUG]: Start shutdown CK node");
-            cJSON_Delete(commandJSON);
-            return;
+            sendHttpResponse(sock, 200, "", 0);
         } else {
             sendErrorMessage(sock, "unknown action", ERROR_CODE);
         }
-
-        int n1 = sendHttpResponse(sock, 200, resultJSONtext, strlen(resultJSONtext));
-
-        free(resultJSONtext);
-
-        if (n1 < 0) {
-            perror("ERROR writing to socket");
-            return;
-        }
     } else {
         sendErrorMessage(sock, ERROR_MESSAGE_SECRET_KEY_MISSMATCH, ERROR_CODE_SECRET_KEY_MISMATCH);
-        return;
     }
 	cJSON_Delete(commandJSON);
-    if (client_message == NULL) {
-        perror("Error ! Try to free not allocated memory client_message");
-        exit(1);
-    }
     free(client_message);
 
 	printf("[INFO]: Action completed successfuly\n");
