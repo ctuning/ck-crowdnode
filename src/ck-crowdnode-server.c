@@ -705,9 +705,6 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
     cJSON *fileContentJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_FILE_CONTENT);
     if (!fileContentJSON) {
         printf("[ERROR]: Invalid action JSON format for message: \n");
-        if (commandJSON != NULL) {
-            cJSON_Delete(commandJSON);
-        }
         sendErrorMessage(sock, "Invalid action JSON format for message: no fileContentJSON found", ERROR_CODE);
         return;
     }
@@ -735,9 +732,6 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
     if (!file) {
         char *message = concat("Could not write file at path: ", filePath);
         printf("[ERROR]: %s\n", message);
-        if (commandJSON != NULL) {
-            cJSON_Delete(commandJSON);
-        }
         sendErrorMessage(sock, message, ERROR_CODE);
         free(file_content);
         return;
@@ -803,11 +797,6 @@ void processPull(int sock, char* baseDir, cJSON* commandJSON) {
     if (!file) {
         char *message = concat("File not found at path:", filePath);
         printf("[ERROR]: %s", message);
-
-        if (commandJSON != NULL) {
-            cJSON_Delete(commandJSON);
-        }
-
         sendErrorMessage(sock, message, ERROR_CODE);
         return;
     }
@@ -865,7 +854,6 @@ void processShell(int sock, cJSON* commandJSON) {
     cJSON *shellCommandJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_SHELL_COMMAND);
     if (!shellCommandJSON) {
         printf("[ERROR]: Invalid action JSON format for provided message\n");
-        //todo check if need to cJSON_Delete(commandJSON) here as well
         sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
         return;
     }
@@ -874,7 +862,6 @@ void processShell(int sock, cJSON* commandJSON) {
 
     if (!shellCommand) {
         printf("[ERROR]: Invalid action JSON format for provided message\n");
-        //todo check if need to cJSON_Delete(commandJSON) here as well
         sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
         return;
     }
