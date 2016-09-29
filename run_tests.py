@@ -77,11 +77,11 @@ module_cfg = {
     'cid': test_repo_cid
 }
 
-def access_test_repo(param_dict):
+def access_test_repo(param_dict, checkFail=True):
     d = {'secretkey': module_cfg['secret_key'], 'cid': module_cfg['cid']}
     d.update(param_dict)
     r = ck.access(d)
-    if r['return']>0:
+    if checkFail and r['return']>0:
         raise AssertionError('Failed to access test repo. Call parameters:\n ' + str(d) + '\nResult:\n ' + str(r))
     return r
 

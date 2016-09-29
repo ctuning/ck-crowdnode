@@ -48,3 +48,13 @@ class TestPushPull(unittest.TestCase):
                 os.remove(tmp_file)
             except: pass
 
+    def test_extra_path_2(self):
+        orig_file = 'ck-master.zip'
+        r = access_test_repo({'action': 'push', 'filename': orig_file, 'extra_path': '1/2/3'}, checkFail=False)
+        self.assertEqual(1, r['return'])
+
+        # check two times to make sure the server is OK
+        r = access_test_repo({'action': 'push', 'filename': orig_file, 'extra_path': '11/21/31'}, checkFail=False)
+        self.assertEqual(1, r['return'])
+
+        print(r)
