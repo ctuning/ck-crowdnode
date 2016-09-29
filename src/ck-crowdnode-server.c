@@ -316,7 +316,7 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
 
     FILE *file=fopen(filePath, "rb");
     if (!file) {
-        printf("[ERROR]: File not found at path: %s\n", filePath);
+        printf("[WARN]: File not found at path: %s\n", filePath);
         return 0;
     }
 
@@ -453,18 +453,16 @@ int main( int argc, char *argv[] , char** envp) {
 
     if (!loadConfigFromFile(ckCrowdnodeServerConfig, envp)) {
         loadDefaultConfig(ckCrowdnodeServerConfig, envp);
-        printf("[WARN]: CK-crowdnode-server configuration file problem. Server will be started with default configuration, port: %i, pathToFiles: %s, secret_key: %s\n",
-               ckCrowdnodeServerConfig->port,
-               ckCrowdnodeServerConfig->pathToFiles,
-               ckCrowdnodeServerConfig->secretKey
-        );
+        printf("[WARN]: CK-crowdnode-server configuration file problem. Server will be started with default configuration\n");
     } else {
-        printf("[INFO]: CK-crowdnode-server configuration file loaded successfully with configuration, port: %i, pathToFiles: %s, secret_key: %s\n",
-               ckCrowdnodeServerConfig->port,
-               ckCrowdnodeServerConfig->pathToFiles,
-               ckCrowdnodeServerConfig->secretKey
-        );
+        printf("[INFO]: CK-crowdnode-server configuration file loaded successfully with configuration\n");
     }
+
+    printf("\n");
+    printf("[INFO for CK client]: server port:          %i\n", ckCrowdnodeServerConfig->port);
+    printf("[INFO for CK client]: server path to files: %s\n", ckCrowdnodeServerConfig->pathToFiles);
+    printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);    
+    printf("\n");
 
     createCKFilesDirectoryIfDoesnotExist(getAbsolutePath(ckCrowdnodeServerConfig->pathToFiles, envp));
 
@@ -736,7 +734,7 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
     FILE *file = fopen(filePath, "wb");
     if (!file) {
         char *message = concat("Could not write file at path: ", filePath);
-        printf("[ERROR]: %s", message);
+        printf("[ERROR]: %s\n", message);
         if (commandJSON != NULL) {
             cJSON_Delete(commandJSON);
         }
@@ -759,8 +757,8 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
      * return successful response message, example:
      *   {"return":0, "compileUUID": <generated UID>}
      */
-    char compileUUID[38];
-    get_uuid_string(compileUUID, sizeof(compileUUID));
+    // char compileUUID[38];
+    // get_uuid_string(compileUUID, sizeof(compileUUID));
 
     cJSON *resultJSON = cJSON_CreateObject();
     if (!resultJSON) {
@@ -769,7 +767,7 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
     }
     printf("[INFO]: resultJSON created\n");
     cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-    cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
+    // cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
     sendJson(sock, resultJSON);
     cJSON_Delete(resultJSON);
 }
@@ -881,7 +879,7 @@ void processShell(int sock, cJSON* commandJSON) {
         return;
     }
 
-    int systemReturnCode = system(shellCommand);
+    int systemReturnCode = 0;
 
     char path[MAX_BUFFER_SIZE + 1];
     unsigned char *stdoutText = malloc(MAX_BUFFER_SIZE + 1);
@@ -916,9 +914,9 @@ void processShell(int sock, cJSON* commandJSON) {
     }
 
 #ifdef _WIN32
-    _pclose(fp);
+    systemReturnCode = _pclose(fp);
 #else
-    pclose(fp);
+    systemReturnCode = pclose(fp);
 #endif
 
     stdoutText[totalRead] ='\0';
