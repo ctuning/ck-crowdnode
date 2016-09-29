@@ -60,15 +60,36 @@ sys.path.append(ck_dir)
 
 import ck.kernel as ck
 
-r = ck.access({'remote': 'yes', 'module_uoa': 'repo', 'url': 'http://localhost:3333', 'quiet': 'yes', 'data_uoa': 'remote-ck-node', 'action': 'add'})
+test_repo_name = 'ck-crowdnode-auto-tests'
+test_repo_cid = test_repo_name + '::'
+r = ck.access({'module_uoa': 'repo', 'data_uoa': test_repo_name, 'action': 'remove', 'force': 'yes', 'all': 'yes'})
+r = ck.access({'remote': 'yes', 'module_uoa': 'repo', 'url': 'http://localhost:3333', 'quiet': 'yes', 'data_uoa': test_repo_name, 'action': 'add'})
+if r['return']>0:
+    print('Unable to create test repo. ' + r.get('error', ''))
+    die(1)
 
 tests_dir = os.path.join(script_dir, 'tests')
+
+module_cfg = {
+    'secret_key': 'c4e239b4-8471-11e6-b24d-cbfef11692ca',
+    'platform': platform.system(),
+    'repo_name': test_repo_name,
+    'cid': test_repo_cid
+}
+
+def access_test_repo(param_dict):
+    d = {'secretkey': module_cfg['secret_key'], 'cid': module_cfg['cid']}
+    d.update(param_dict)
+    r = ck.access(d)
+    if r['return']>0:
+        raise AssertionError('Failed to access test repo. Call parameters:\n ' + str(d) + '\nResult:\n ' + str(r))
+    return r
 
 class CkTestLoader(unittest.TestLoader):
     def loadTestsFromModule(self, module, pattern=None):
         module.ck = ck
-        module.secret_key = 'c4e239b4-8471-11e6-b24d-cbfef11692ca'
-        module.platform = platform.system()
+        module.cfg = module_cfg
+        module.access_test_repo = access_test_repo
         return unittest.TestLoader.loadTestsFromModule(self, module, pattern)
 
 suite = CkTestLoader().discover(tests_dir, pattern='test_*.py')
