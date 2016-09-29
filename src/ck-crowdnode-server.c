@@ -959,7 +959,7 @@ void doProcessing(int sock, char *baseDir) {
                 return;
             }
 
-            int systemReturnCode = system(shellCommand);
+            int systemReturnCode = 0;
 
             char path[MAX_BUFFER_SIZE + 1];
             unsigned char *stdoutText = malloc(MAX_BUFFER_SIZE + 1);
@@ -994,9 +994,9 @@ void doProcessing(int sock, char *baseDir) {
             }
 
 #ifdef _WIN32
-            _pclose(fp);
+            systemReturnCode = _pclose(fp);
 #else
-            pclose(fp);
+            systemReturnCode = pclose(fp);
 #endif
 
             stdoutText[totalRead] ='\0';
