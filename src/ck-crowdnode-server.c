@@ -19,6 +19,7 @@
     #include <netdb.h> /* struct hostent, gethostbyname */
     #include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
     #include <ctype.h>
+#include <sys/stat.h>
 
 #elif _WIN32
 #include <winsock2.h>
@@ -57,7 +58,7 @@ static char *const JSON_PARAM_SHELL_COMMAND = "cmd";
  * todo move out to config /etc/ck-crowdnode/ck-crowdnode.properties
  */
 #define MAX_BUFFER_SIZE 1024
-static const int DEFAULT_SERVER_PORT = 3333;
+#define DEFAULT_SERVER_PORT 3333
 static const int MAXPENDING = 5;    /* Maximum outstanding connection requests */
 
 static char *const JSON_CONFIG_PARAM_PORT = "port";
@@ -65,12 +66,14 @@ static char *const JSON_CONFIG_PARAM_PATH_TO_FILES = "path_to_files";
 static char *const JSON_CONFIG_PARAM_SECRET_KEY = "secret_key";
 
 #ifdef _WIN32
-static char *const DEFAULT_BASE_DIR = "C:\\tmp\\"; //todo move to config
+static char *const DEFAULT_BASE_DIR = "%LOCALAPPDATA%/ck-crowdnode-files/";
+static char *const DEFAULT_CONFIG_DIR = "%LOCALAPPDATA%/.ck-crowdnode/";
 static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%/.ck-crowdnode/ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "%LOCALAPPDATA%";
 static char *const HOME_DIR_ENV_KEY = "LOCALAPPDATA";
 #else
-static char *const DEFAULT_BASE_DIR = "/tmp/";
+static char *const DEFAULT_BASE_DIR = "$HOME/ck-crowdnode-files/";
+static char *const DEFAULT_CONFIG_DIR = "$HOME/.ck-crowdnode/";
 static char *const DEFAULT_CONFIG_FILE_PATH = "$HOME/.ck-crowdnode/ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "$HOME";
 static char *const HOME_DIR_ENV_KEY = "HOME";
@@ -148,8 +151,8 @@ int sockSendAll(int sock, const void* buf, size_t len) {
 
 int sendHttpResponse(int sock, int httpStatus, char* payload, int size) {
     // send HTTP headers
-    char buf[200];
-    int n = sprintf(buf, "HTTP/1.1 %d OK\r\nContent-Length: %d\r\n\r\n", httpStatus, size);
+    char buf[300];
+    int n = sprintf(buf, "HTTP/1.1 %d OK\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: %d\r\n\r\n", httpStatus, size);
     if (0 >= n) {
         perror("sprintf failed");
         return -1;
@@ -226,6 +229,8 @@ static char *const JSON_PARAM_NAME_SECRETKEY = "secretkey";
 static char *const ERROR_MESSAGE_SECRET_KEY_MISSMATCH = "secret keys do not match";
 static char *const ERROR_CODE_SECRET_KEY_MISMATCH = "3";
 static char *const ERROR_CODE = "1";
+
+static const int DEFAULT_DIR_MODE = 0700;
 
 char *str_replace(char *orig, char *rep, char *with) {
     char *result; // the return string
@@ -366,15 +371,69 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
     return 1;
 }
 
+int createCKFilesDirectoryIfDoesnotExist(char * ckFilesDirectory, char** envp) {
+    char *dirPath = getAbsolutePath(ckFilesDirectory, envp);
+    int createDirState = 0;
+    printf("[INFO]: Check CK crowdnode server files directory: %s\n", dirPath);
+    createDirState = mkdir(dirPath, DEFAULT_DIR_MODE);
+    if (createDirState<0) {
+        perror("[WARN]: Directory was not created");
+    } else {
+        printf("[INFO]: CK crowdnode server files directory created: %s\n", dirPath);
+    }
+    return createDirState;
+}
+
 int loadDefaultConfig(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** envp) {
     ckCrowdnodeServerConfig->port = DEFAULT_SERVER_PORT;
     ckCrowdnodeServerConfig->pathToFiles = getAbsolutePath(DEFAULT_BASE_DIR, envp);
     char generatedSecretKey[38];
     get_uuid_string(generatedSecretKey, sizeof(generatedSecretKey));
-    size_t size = strlen(generatedSecretKey) + sizeof(char);
-    ckCrowdnodeServerConfig->secretKey = malloc(size);
-    memset(ckCrowdnodeServerConfig->secretKey, 0, size);
+    size_t generatedSecretKeySize = strlen(generatedSecretKey) + sizeof(char);
+    ckCrowdnodeServerConfig->secretKey = malloc(generatedSecretKeySize);
+    memset(ckCrowdnodeServerConfig->secretKey, 0, generatedSecretKeySize);
     strcpy(ckCrowdnodeServerConfig->secretKey, generatedSecretKey);
+
+    char *configDir = getAbsolutePath(DEFAULT_CONFIG_DIR, envp);
+    int createDirState = 0;
+    createDirState = mkdir(configDir, DEFAULT_DIR_MODE);
+    if (createDirState<0) {
+        perror("[WARN]: Configuration directory was not created");
+    }
+
+    char *configFilePath = getAbsolutePath(DEFAULT_CONFIG_FILE_PATH, envp);
+    FILE *file = fopen(configFilePath, "wb");
+    if (!file) {
+        perror("[ERROR]: Could not created default configuration file\n");
+        exit(1);
+    }
+
+    printf("[DEBUG]: Open default configuration file to write %s\n", configFilePath);
+
+    cJSON *defaultConfigJSON = cJSON_CreateObject();
+    if (!defaultConfigJSON) {
+        perror("[ERROR]: Memory not allocated for defaultConfigJSON\n");
+        exit(1);
+    }
+
+    char *defaultCrowdnodeServerConfig = malloc(generatedSecretKeySize);
+    memset(defaultCrowdnodeServerConfig, 0, generatedSecretKeySize);
+    strcpy(defaultCrowdnodeServerConfig, generatedSecretKey);
+    cJSON_AddNumberToObject(defaultConfigJSON, JSON_CONFIG_PARAM_PORT, DEFAULT_SERVER_PORT);
+    cJSON_AddItemToObject(defaultConfigJSON, JSON_CONFIG_PARAM_PATH_TO_FILES, cJSON_CreateString(getAbsolutePath(DEFAULT_BASE_DIR, envp)));
+    cJSON_AddItemToObject(defaultConfigJSON, JSON_CONFIG_PARAM_SECRET_KEY, cJSON_CreateString(defaultCrowdnodeServerConfig));
+    char *file_content = cJSON_PrintUnformatted(defaultConfigJSON);
+    printf("[INFO]: Default configuration JSON created: %s\n", file_content);
+
+    int results = fwrite(file_content, 1, strlen(file_content), file);
+    if (results == EOF) {
+        perror("[ERROR]: Failed to write  default configuration file");
+        exit(1);
+
+    }
+    fclose(file);
+    free(file_content);
+    cJSON_Delete(defaultConfigJSON);
 }
 
 int main( int argc, char *argv[] , char** envp) {
@@ -395,8 +454,6 @@ int main( int argc, char *argv[] , char** envp) {
                ckCrowdnodeServerConfig->pathToFiles,
                ckCrowdnodeServerConfig->secretKey
         );
-        ckCrowdnodeServerConfig->port = DEFAULT_SERVER_PORT;
-        ckCrowdnodeServerConfig->pathToFiles = DEFAULT_BASE_DIR;
     } else {
         printf("[INFO]: CK-crowdnode-server configuration file loaded successfully with configuration, port: %i, pathToFiles: %s, secret_key: %s\n",
                ckCrowdnodeServerConfig->port,
@@ -404,6 +461,8 @@ int main( int argc, char *argv[] , char** envp) {
                ckCrowdnodeServerConfig->secretKey
         );
     }
+
+    createCKFilesDirectoryIfDoesnotExist(ckCrowdnodeServerConfig->pathToFiles, envp);
 
     serverSecretKey = ckCrowdnodeServerConfig->secretKey;
     int sockfd, newsockfd;
