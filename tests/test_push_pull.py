@@ -30,3 +30,21 @@ class TestPushPull(unittest.TestCase):
                 os.remove(tmp_file)
             except: pass
 
+    def test_extra_path(self):
+        tmp_file = 'ck-push-test.zip'
+        orig_file = 'ck-master.zip'
+        shutil.copyfile(orig_file, tmp_file)
+        try:
+            access_test_repo({'action': 'push', 'filename': tmp_file, 'extra_path': 'a'})
+
+            os.remove(tmp_file)
+
+            access_test_repo({'action': 'pull', 'filename': tmp_file, 'extra_path': 'a'})
+
+            # the downloaded file must match the original file
+            self.assertTrue(filecmp.cmp(orig_file, tmp_file))
+        finally:
+            try:
+                os.remove(tmp_file)
+            except: pass
+

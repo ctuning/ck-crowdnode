@@ -189,7 +189,7 @@ void sendErrorMessage(int sock, char * errorMessage, const char *errorCode) {
         perror("[ERROR]: resultJSONtext cannot be created");
         return;
     }
-    int n = sendHttpResponse(sock, 500, resultJSONtext, strlen(resultJSONtext));
+    int n = sendHttpResponse(sock, 200, resultJSONtext, strlen(resultJSONtext));
     if (n < 0) {
 		perror("ERROR writing to socket");
 		return ;
