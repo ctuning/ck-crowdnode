@@ -7,4 +7,4 @@ if %errorlevel% neq 0 exit /b %errorlevel%
 mkdir build
 cd build
 
-cl ../src/*.c /Feck-crowdtune.exe /link wsock32.lib
+cl ../src/*.c /Feck-crowdnode-server.exe /link wsock32.lib
