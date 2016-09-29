@@ -1008,11 +1008,13 @@ void doProcessing(int sock, char *baseDir) {
 	if (encodedJSONPostData != NULL) {
 		char *encodedJSON = encodedJSONPostData + strlen(CK_JSON_KEY);
 		decodedJSON = url_decode(encodedJSON, total_read - (encodedJSON - client_message));
+        free(client_message);
 	} else {
 		decodedJSON = client_message;
 	}
 
 	cJSON *commandJSON = cJSON_Parse(decodedJSON);
+    free(decodedJSON);
 	if (!commandJSON) {
 		sendErrorMessage(sock, "Invalid action JSON format for message", ERROR_CODE);
 		return;
@@ -1059,7 +1061,7 @@ void doProcessing(int sock, char *baseDir) {
 
             cJSON *resultJSON = cJSON_CreateObject();
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-            resultJSONtext = cJSON_PrintUnformatted(resultJSON);
+            sendJson(sock, resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "clear", 4) == 0) {
             printf("[DEBUG]: Clearing tmp files ...");
@@ -1076,7 +1078,6 @@ void doProcessing(int sock, char *baseDir) {
         sendErrorMessage(sock, ERROR_MESSAGE_SECRET_KEY_MISSMATCH, ERROR_CODE_SECRET_KEY_MISMATCH);
     }
 	cJSON_Delete(commandJSON);
-    free(client_message);
 
 	printf("[INFO]: Action completed successfuly\n");
 }
