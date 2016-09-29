@@ -169,6 +169,8 @@ int sendHttpResponse(int sock, int httpStatus, char* payload, int size) {
         perror("Failed to send HTTP response body");
         return -1;
     }
+
+    return 0;
 }
 
 void sendErrorMessage(int sock, char * errorMessage, const char *errorCode) {
@@ -253,7 +255,7 @@ char *str_replace(char *orig, char *rep, char *with) {
     len_with = strlen(with);
 
     ins = orig;
-    for (count = 0; tmp = strstr(ins, rep); ++count) {
+    for (count = 0; (tmp = strstr(ins, rep)); ++count) {
         ins = tmp + len_rep;
     }
 
@@ -291,7 +293,7 @@ char *getEnvValue(char *param, char** envp ) {
             char *string = str_replace(value, rep, "");
             return string;
         }
-        *envp++;
+        ++envp;
     }
     return NULL;
 }
@@ -385,7 +387,7 @@ int createCKFilesDirectoryIfDoesnotExist(char * dirPath) {
     return createDirState;
 }
 
-int loadDefaultConfig(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** envp) {
+void loadDefaultConfig(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** envp) {
     ckCrowdnodeServerConfig->port = DEFAULT_SERVER_PORT;
     ckCrowdnodeServerConfig->pathToFiles = getAbsolutePath(DEFAULT_BASE_DIR, envp);
     char generatedSecretKey[38];
@@ -896,7 +898,7 @@ void doProcessing(int sock, char *baseDir) {
             long fsize = ftell(file);
             fseek(file, 0, SEEK_SET);
 
-            char *fileContent = malloc(fsize + 1);
+            unsigned char *fileContent = malloc(fsize + 1);
             memset(fileContent, 0, fsize + 1);
             fread(fileContent, fsize, 1, file);
             fclose(file);
@@ -960,7 +962,7 @@ void doProcessing(int sock, char *baseDir) {
             int systemReturnCode = system(shellCommand);
 
             char path[MAX_BUFFER_SIZE + 1];
-            char *stdoutText = malloc(MAX_BUFFER_SIZE + 1);
+            unsigned char *stdoutText = malloc(MAX_BUFFER_SIZE + 1);
             if (stdoutText == NULL) {
                 perror("[ERROR]: Memory not allocated for stdoutText first time");
                 exit(1);
