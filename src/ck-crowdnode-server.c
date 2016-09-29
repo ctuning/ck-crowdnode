@@ -979,19 +979,16 @@ void doProcessing(int sock, char *baseDir) {
                 exit(1);
             }
 
-            int buffer_read = 0;
-            int total_read = 0;
+            int totalRead = 0;
             while (fgets(path, sizeof(path) - 1, fp) != NULL) {
-                buffer_read = sizeof(path) - 1;
-                printf("[INFO]: Next buffer_read: %i\n", buffer_read);
-                printf("[INFO]: Next stdout line length: %lu, line text: %s", (unsigned long)(strlen(path)), path);
-                stdoutText = realloc(stdoutText, total_read + buffer_read + 1);
+                unsigned long pathSize = (unsigned long)(strlen(path));
+                stdoutText = realloc(stdoutText, totalRead + pathSize + 1);
                 if (stdoutText == NULL) {
                     perror("[ERROR]: Memory not allocated stdout");
                     exit(1);
                 }
-                strcat(stdoutText + strlen(stdoutText), path);
-                total_read = total_read + buffer_read;
+                memcpy(stdoutText + totalRead, path, pathSize);
+                totalRead = totalRead + pathSize;
             }
 
 #ifdef _WIN32
@@ -1000,16 +997,30 @@ void doProcessing(int sock, char *baseDir) {
             pclose(fp);
 #endif
 
-            printf("[INFO]: total stdout line length: %i\n", total_read);
+            stdoutText[totalRead] ='\0';
+            printf("[INFO]: total stdout length: %i\n", totalRead);
             printf("[DEBUG]: stdout: %s\n", stdoutText);
+
+            char *encodedContent = "";
+            if (totalRead > 0) {
+                unsigned long targetSize = (unsigned long) ((totalRead) * 4 / 3 + 5);
+                printf("[DEBUG]: Target stdout encoded size: %lu\n", targetSize);
+                encodedContent = malloc(targetSize);
+                if (!encodedContent) {
+                    perror("[ERROR]: Memory not allocated for encoded stdout Content");
+                    exit(1);
+                }
+                memset(encodedContent, 0, targetSize);
+                base64_encode(stdoutText, totalRead, encodedContent, targetSize);
+            }
 
             cJSON *resultJSON = cJSON_CreateObject();
             cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
 
             cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
-            cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(stdoutText)); 
-            cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString("some program stderr"));   //todo get stderr
+            cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(encodedContent));
+            cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(""));   //todo get stderr
             resultJSONtext = cJSON_PrintUnformatted(resultJSON);
             cJSON_Delete(resultJSON);
         } else if (strncmp(action, "state", 4) == 0) {

@@ -1,7 +1,7 @@
 mkdir build
 cd build
 
-rm ck-crowdnode-server 
+rm * 
 
 cmake -DCMAKE_BUILD_TYPE=Debug ..
 
