@@ -16,7 +16,6 @@ class TestPushPull(unittest.TestCase):
         self.assertIn('stdout_base64', r)
         self.assertIn('return_code', r)
         self.assertIn('stderr_base64', r)
-        self.assertIn('encoding', r)
 
     def test_shell_err(self):
         cmd = 'nodir C:\\' if 'Windows' == cfg['platform'] else 'nols -l /etc/'
@@ -24,7 +23,6 @@ class TestPushPull(unittest.TestCase):
         self.assertIn('stdout_base64', r)
         self.assertIn('return_code', r)
         self.assertIn('stderr_base64', r)
-        self.assertIn('encoding', r)
 
     def test_non_latin(self):
         fname = 'non-latin.txt'
