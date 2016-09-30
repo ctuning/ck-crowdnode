@@ -511,10 +511,10 @@ int main( int argc, char *argv[] , char** envp) {
     }
 
     printf("\n");
+    printf("[INFO for CK client]: server real IP:       %s\n", getLocalIPv4Adress());
     printf("[INFO for CK client]: server port:          %i\n", ckCrowdnodeServerConfig->port);
     printf("[INFO for CK client]: server path to files: %s\n", ckCrowdnodeServerConfig->pathToFiles);
     printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);
-    printf("[INFO for CK client]: real IP: %s\n", getLocalIPv4Adress());
     printf("\n");
 
     createCKFilesDirectoryIfDoesnotExist(getAbsolutePath(ckCrowdnodeServerConfig->pathToFiles, envp));
@@ -1036,9 +1036,9 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
 
     int ret = remove(tmpStdErrFilePath);
     if(ret == 0) {
-        printf("[INFO]: tmp stderr file %s deleted successfully", tmpStdErrFilePath);
+        printf("[INFO]: tmp stderr file %s deleted successfully\n", tmpStdErrFilePath);
     } else {
-        perror("[ERROR]: unable to delete the tmp stderr file");
+        perror("[ERROR]: unable to delete the tmp stderr file\n");
     }
 }
 
