@@ -16,8 +16,11 @@ def safe_remove(fname):
     except Exception:
         pass
 
-arg_parser = argparse.ArgumentParser()
-arg_parser.add_argument('--server_executable', default='build/ck-crowdnode-server')
+arg_parser = argparse.ArgumentParser(description='Run crowdnode tests')
+arg_parser.add_argument('--server_executable', default='build/ck-crowdnode-server', 
+    help='path to the crowdnode executable')
+arg_parser.add_argument('--ck_dir', 
+    help='path to the CK kernel directory. If not given, the newest kernel will be downloaded')
 args = arg_parser.parse_args()
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -32,12 +35,13 @@ files_dir = os.path.join(script_dir, 'ck-crowdnode-files')
 if not os.path.exists(files_dir):
     os.makedirs(files_dir)
 
-node_process=None
-ck_dir='tests-ck-master'
+node_process = None
+remove_ck_dir = args.ck_dir is None
 
 def die(retcode):
     os.chdir(script_dir)
-    shutil.rmtree(ck_dir, ignore_errors=True)
+    if remove_ck_dir:
+        shutil.rmtree(ck_dir, ignore_errors=True)
     shutil.rmtree(files_dir, ignore_errors=True)
     safe_remove(config_file)
     if node_process is not None:
@@ -55,11 +59,14 @@ else:
 
 node_process = subprocess.Popen([args.server_executable], env=node_env)
 
-shutil.rmtree(ck_dir, ignore_errors=True)
-r = subprocess.call('git clone https://github.com/ctuning/ck.git ' + ck_dir, shell=True)
-if 0 < r:
-    print('Error: failed to clone CK!')
-    die(1)
+ck_dir=args.ck_dir
+if args.ck_dir is None:
+    ck_dir='test-ck-master'
+    shutil.rmtree(ck_dir, ignore_errors=True)
+    r = subprocess.call('git clone https://github.com/ctuning/ck.git ' + ck_dir, shell=True)
+    if 0 < r:
+        print('Error: failed to clone CK!')
+        die(1)
 
 sys.path.append(ck_dir)
 
@@ -87,7 +94,7 @@ def access_test_repo(param_dict, checkFail=True):
     d.update(param_dict)
     r = ck.access(d)
     if checkFail and r['return']>0:
-        raise AssertionError('Failed to access test repo. Call parameters:\n ' + str(d) + '\nResult:\n ' + str(r))
+        raise AssertionError('Failed to access test repo. Call parameters:\n ' + str(d) + '\n')
     return r
 
 class CkTestLoader(unittest.TestLoader):
