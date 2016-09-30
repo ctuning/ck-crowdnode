@@ -25,7 +25,6 @@
     #include <ctype.h>
 #include <sys/stat.h>
 #include <ifaddrs.h>
-#include <stropts.h>
 #include <sys/ioctl.h>
 
 #elif _WIN32
