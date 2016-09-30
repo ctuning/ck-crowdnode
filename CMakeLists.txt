@@ -22,7 +22,6 @@ IF(WIN32)
     include(InstallRequiredSystemLibraries)
 
     install( TARGETS ck-crowdnode-server DESTINATION bin )
-    install( TARGETS ws2_32 DESTINATION bin COMPONENT Libraries)
     install( FILES ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS} DESTINATION bin COMPONENT Libraries )
 
     set(CPACK_GENERATOR WIX)
