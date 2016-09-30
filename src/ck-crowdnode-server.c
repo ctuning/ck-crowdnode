@@ -842,7 +842,7 @@ void processPull(int sock, char* baseDir, cJSON* commandJSON) {
     free(encodedContent);
 }
 
-void processShell(int sock, cJSON* commandJSON) {
+void processShell(int sock, cJSON* commandJSON, char *baseDir) {
     //  shell (to execute a binary at CK node)
     // todo implement:
     // 1) find local file by provided name - send JSON error if not found
@@ -876,12 +876,20 @@ void processShell(int sock, cJSON* commandJSON) {
     }
     memset(stdoutText, 0, MAX_BUFFER_SIZE + 1);
 
+    char tmpFilename[38];
+    get_uuid_string(tmpFilename, sizeof(tmpFilename));
+
+    char *tmpStdErrFilePath = concat(baseDir, "/");
+    tmpStdErrFilePath = concat(tmpStdErrFilePath,tmpFilename);
+    char *redirectString = concat(" 2>", tmpStdErrFilePath);
+    char *shellCommandWithStdErr = concat(shellCommand, redirectString);
+    printf("[INFO]: Run command: %s\n", shellCommandWithStdErr);
     /* Open the command for reading. */
     FILE *fp;
 #ifdef _WIN32
-    fp = _popen(shellCommand, "r");
+    fp = _popen(shellCommandWithStdErr, "r");
 #else
-    fp = popen(shellCommand, "r");
+    fp = popen(shellCommandWithStdErr, "r");
 #endif
     if (fp == NULL) {
         printf("[ERROR]: Failed to run command: %s\n", shellCommand);
@@ -931,9 +939,52 @@ void processShell(int sock, cJSON* commandJSON) {
     cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
     cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(encodedContent));
-    cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(""));   //todo get stderr
+
+    long fsize = 0;
+    FILE *stdErrFile = fopen(tmpStdErrFilePath, "rb");
+    if (!stdErrFile) {
+        sendErrorMessage(sock, "can't find stderr tmp file", ERROR_CODE);
+        return;
+    }
+
+    unsigned char *stdErr = "";
+    if (stdErrFile) {
+        fseek(stdErrFile, 0, SEEK_END);
+        fsize = ftell(stdErrFile);
+        fseek(stdErrFile, 0, SEEK_SET);
+
+        stdErr = malloc(fsize + 1);
+        memset(stdErr, 0, fsize + 1);
+        fread(stdErr, fsize, 1, stdErrFile);
+        fclose(stdErrFile);
+    }
+    printf("[DEBUG]: stderr file size: %lu\n", fsize);
+
+    char *encodedStdErr = "";
+    if (fsize > 0) {
+        unsigned long targetSize = (unsigned long) ((fsize) * 4 / 3 + 5);
+        printf("[DEBUG]: Target stderr encoded size: %lu\n", targetSize);
+        encodedStdErr = malloc(targetSize);
+        if (!encodedStdErr) {
+            perror("[ERROR]: Memory not allocated for encoded stderr content\n");
+            exit(1);
+        }
+        memset(encodedStdErr, 0, targetSize);
+        base64_encode(stdErr, fsize, encodedStdErr, targetSize);
+        free(stdErr);
+    }
+
+    cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(encodedStdErr));
+
     sendJson(sock, resultJSON);
     cJSON_Delete(resultJSON);
+
+    int ret = remove(tmpStdErrFilePath);
+    if(ret == 0) {
+        printf("[INFO]: tmp stderr file %s deleted successfully", tmpStdErrFilePath);
+    } else {
+        perror("[ERROR]: unable to delete the tmp stderr file");
+    }
 }
 
 void doProcessing(int sock, char *baseDir) {
@@ -1037,7 +1088,7 @@ void doProcessing(int sock, char *baseDir) {
         } else if (strncmp(action, "pull", 4) == 0) {
             processPull(sock, baseDir, commandJSON);
         } else if (strncmp(action, "shell", 4) == 0) {
-            processShell(sock, commandJSON);
+            processShell(sock, commandJSON, baseDir);
         } else if (strncmp(action, "state", 4) == 0) {
             printf("[DEBUG]: Check run state by runUUID ");
             cJSON *params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
