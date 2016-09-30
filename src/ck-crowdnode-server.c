@@ -7,6 +7,10 @@
 # See Copyright.txt for copyright details.
 #
 # Developer: Daniil Efremov
+*
+* Contributors: Dmitry Savenko
+*               Grigori Fursin
+*              
  */
 #include <stdio.h>
 #include <string.h>

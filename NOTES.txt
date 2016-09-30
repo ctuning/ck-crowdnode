@@ -1,3 +1,4 @@
-Android and C:
- http://www.ibm.com/developerworks/opensource/tutorials/os-androidndk/index.html
- https://www.quora.com/Is-there-any-app-on-Android-which-allows-us-to-run-our-C-C++-Java-programs-on-Android-for-practice
+Assorted notes:
+ Android and C:
+  http://www.ibm.com/developerworks/opensource/tutorials/os-androidndk/index.html
+  https://www.quora.com/Is-there-any-app-on-Android-which-allows-us-to-run-our-C-C++-Java-programs-on-Android-for-practice
