@@ -68,17 +68,19 @@ static char *const JSON_CONFIG_PARAM_PATH_TO_FILES = "path_to_files";
 static char *const JSON_CONFIG_PARAM_SECRET_KEY = "secret_key";
 
 #ifdef _WIN32
-static char *const DEFAULT_BASE_DIR = "%LOCALAPPDATA%/ck-crowdnode-files/";
-static char *const DEFAULT_CONFIG_DIR = "%LOCALAPPDATA%/.ck-crowdnode/";
-static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%/.ck-crowdnode/ck-crowdnode-config.json";
+static char *const DEFAULT_BASE_DIR = "%LOCALAPPDATA%\\ck-crowdnode-files\\";
+static char *const DEFAULT_CONFIG_DIR = "%LOCALAPPDATA%\\.ck-crowdnode\\";
+static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%\\.ck-crowdnode\\ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "%LOCALAPPDATA%";
 static char *const HOME_DIR_ENV_KEY = "LOCALAPPDATA";
+#define FILE_SEPARATOR "\\"
 #else
 static char *const DEFAULT_BASE_DIR = "$HOME/ck-crowdnode-files/";
 static char *const DEFAULT_CONFIG_DIR = "$HOME/.ck-crowdnode/";
 static char *const DEFAULT_CONFIG_FILE_PATH = "$HOME/.ck-crowdnode/ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "$HOME";
 static char *const HOME_DIR_ENV_KEY = "HOME";
+#define FILE_SEPARATOR "/"
 
 int WSAGetLastError() {
 	return 0;
@@ -355,7 +357,7 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
         return 0;
     }
     char *pathToFiles = getAbsolutePath(pathSON->valuestring, envp);
-    ckCrowdnodeServerConfig->pathToFiles = concat(pathToFiles, "/");
+    ckCrowdnodeServerConfig->pathToFiles = concat(pathToFiles, FILE_SEPARATOR);
 
     char * secretKey;
     cJSON *secretKeyJSON = cJSON_GetObjectItem(configSON, JSON_CONFIG_PARAM_SECRET_KEY);
@@ -688,7 +690,7 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
     char *fileName = filenameJSON->valuestring;
     printf("[DEBUG]: File name: %s\n", fileName);
 
-    char *finalBaseDir = concat(baseDir,"/");
+    char *finalBaseDir = concat(baseDir, FILE_SEPARATOR);
 
     //  Optional param extra_path
     cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
@@ -698,7 +700,7 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
         printf("[INFO]: Extra path provided: %s\n", extraPath);
 
         finalBaseDir = concat(finalBaseDir, extraPath);
-        finalBaseDir = concat(finalBaseDir, "/");
+        finalBaseDir = concat(finalBaseDir, FILE_SEPARATOR);
         createCKFilesDirectoryIfDoesnotExist(finalBaseDir);
     }
 
@@ -778,7 +780,7 @@ void processPull(int sock, char* baseDir, cJSON* commandJSON) {
     char *fileName = filenameJSON->valuestring;
     printf("[DEBUG]: File name: %s\n", fileName);
 
-    char *finalBaseDir = concat(baseDir,"/");
+    char *finalBaseDir = concat(baseDir,FILE_SEPARATOR);
 
     //  Optional param extra_path
     cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
@@ -788,7 +790,7 @@ void processPull(int sock, char* baseDir, cJSON* commandJSON) {
         printf("[INFO]: Extra path provided: %s\n", extraPath);
 
         finalBaseDir = concat(finalBaseDir, extraPath);
-        finalBaseDir = concat(finalBaseDir, "/");
+        finalBaseDir = concat(finalBaseDir, FILE_SEPARATOR);
     }
 
     char *filePath = concat(finalBaseDir, fileName);
@@ -879,7 +881,7 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
     char tmpFilename[38];
     get_uuid_string(tmpFilename, sizeof(tmpFilename));
 
-    char *tmpStdErrFilePath = concat(baseDir, "/");
+    char *tmpStdErrFilePath = concat(baseDir, FILE_SEPARATOR);
     tmpStdErrFilePath = concat(tmpStdErrFilePath,tmpFilename);
     char *redirectString = concat(" 2>", tmpStdErrFilePath);
     char *shellCommandWithStdErr = concat(shellCommand, redirectString);
