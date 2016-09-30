@@ -23,15 +23,14 @@
     #include <netdb.h> /* struct hostent, gethostbyname */
     #include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
     #include <ctype.h>
-#include <sys/stat.h>
-#include <ifaddrs.h>
-#include <sys/ioctl.h>
-
+    #include <sys/stat.h>
+    #include <ifaddrs.h>
+    #include <sys/ioctl.h>
 #elif _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-#include <io.h>
+    #include <winsock2.h>
+    #include <ws2tcpip.h>
+    #include <windows.h>
+    #include <io.h>
 
     struct thread_win_params {
       int sock;
@@ -42,7 +41,6 @@
     void doProcessingWin (struct thread_win_params* twp);
 
     #pragma comment(lib,"ws2_32.lib") //Winsock Library
-
 #else
 #endif
 
@@ -59,7 +57,6 @@ static char *const JSCON_PARAM_VALUE_PUSH = "push";
 static char *const JSON_PARAM_FILE_NAME = "filename";
 static char *const JSON_PARAM_FILE_CONTENT = "file_content_base64";
 static char *const JSON_PARAM_EXTRA_PATH = "extra_path";
-
 static char *const JSON_PARAM_SHELL_COMMAND = "cmd";
 
 /**
