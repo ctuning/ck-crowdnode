@@ -19,8 +19,8 @@ IF(WIN32)
 
     target_link_libraries(ck-crowdnode-server ws2_32)
 
-    install(targets ck-crowdnode-server destination .)
-    
+    install( TARGETS ck-crowdnode-server DESTINATION . )
+
     set(CPACK_GENERATOR WIX)
     set(CPACK_PACKAGE_NAME "ck-crowdnode-server")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "CK crowd-node server")
