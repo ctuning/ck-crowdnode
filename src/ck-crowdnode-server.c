@@ -68,9 +68,9 @@ static char *const JSON_CONFIG_PARAM_PATH_TO_FILES = "path_to_files";
 static char *const JSON_CONFIG_PARAM_SECRET_KEY = "secret_key";
 
 #ifdef _WIN32
-static char *const DEFAULT_BASE_DIR = "%LOCALAPPDATA%\\ck-crowdnode-files\\";
-static char *const DEFAULT_CONFIG_DIR = "%LOCALAPPDATA%\\.ck-crowdnode\\";
-static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%\\.ck-crowdnode\\ck-crowdnode-config.json";
+static char *const DEFAULT_BASE_DIR = "%LOCALAPPDATA%/ck-crowdnode-files/";
+static char *const DEFAULT_CONFIG_DIR = "%LOCALAPPDATA%/.ck-crowdnode/";
+static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%/.ck-crowdnode/ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "%LOCALAPPDATA%";
 static char *const HOME_DIR_ENV_KEY = "LOCALAPPDATA";
 #define FILE_SEPARATOR "\\"
@@ -867,6 +867,8 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
         sendErrorMessage(sock, "Invalid action JSON format for message: no filenameJSON found", ERROR_CODE);
         return;
     }
+
+    chdir(baseDir);
 
     int systemReturnCode = 0;
 
