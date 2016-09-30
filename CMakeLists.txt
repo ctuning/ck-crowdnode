@@ -17,6 +17,12 @@ add_executable(ck-crowdnode-server ${SRC})
 
 IF(WIN32)
     target_link_libraries(ck-crowdnode-server ws2_32)
+
+    set(CPACK_GENERATOR WIX)
+    set(CPACK_PACKAGE_NAME "CK crowd-node server")
+
+    INCLUDE(CPack)
+
 ELSE(WIN32)
     target_link_libraries(ck-crowdnode-server m)
 ENDIF(WIN32)

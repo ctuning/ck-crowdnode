@@ -9,8 +9,7 @@ build_script:
     - cd build
     - cmake ..
     - msbuild /p:Configuration=Release /p:Platform=Win32 C:/projects/ck-crowdnode/build/Project.sln
-    - ls C:/projects/ck-crowdnode/build
-    - ls Release
+    - cpack -G WIX -C Release
     - cp Release/ck-crowdnode-server.exe .
     - cd ..
     - "%PYTHON%/python.exe -m run_tests.py"
