@@ -15,3 +15,11 @@ class TestPushPull(unittest.TestCase):
         self.assertIn('stdout', r)
         self.assertIn('return_code', r)
         self.assertIn('stderr', r)
+
+
+    def test_shell_err(self):
+        cmd = 'nodir C:\\' if 'Windows' == cfg['platform'] else 'nols -l /etc/'
+        r = access_test_repo({'action': 'shell', 'cmd': cmd})
+        self.assertIn('stdout', r)
+        self.assertIn('return_code', r)
+        self.assertIn('stderr', r)

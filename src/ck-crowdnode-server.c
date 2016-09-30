@@ -20,6 +20,9 @@
     #include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
     #include <ctype.h>
 #include <sys/stat.h>
+#include <ifaddrs.h>
+#include <stropts.h>
+#include <sys/ioctl.h>
 
 #elif _WIN32
 #include <winsock2.h>
@@ -73,12 +76,14 @@ static char *const DEFAULT_CONFIG_DIR = "%LOCALAPPDATA%/.ck-crowdnode/";
 static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%/.ck-crowdnode/ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "%LOCALAPPDATA%";
 static char *const HOME_DIR_ENV_KEY = "LOCALAPPDATA";
+#define FILE_SEPARATOR "\\"
 #else
 static char *const DEFAULT_BASE_DIR = "$HOME/ck-crowdnode-files/";
 static char *const DEFAULT_CONFIG_DIR = "$HOME/.ck-crowdnode/";
 static char *const DEFAULT_CONFIG_FILE_PATH = "$HOME/.ck-crowdnode/ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "$HOME";
 static char *const HOME_DIR_ENV_KEY = "HOME";
+#define FILE_SEPARATOR "/"
 
 int WSAGetLastError() {
 	return 0;
@@ -355,7 +360,7 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
         return 0;
     }
     char *pathToFiles = getAbsolutePath(pathSON->valuestring, envp);
-    ckCrowdnodeServerConfig->pathToFiles = concat(pathToFiles, "/");
+    ckCrowdnodeServerConfig->pathToFiles = concat(pathToFiles, FILE_SEPARATOR);
 
     char * secretKey;
     cJSON *secretKeyJSON = cJSON_GetObjectItem(configSON, JSON_CONFIG_PARAM_SECRET_KEY);
@@ -440,6 +445,53 @@ void loadDefaultConfig(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
     cJSON_Delete(defaultConfigJSON);
 }
 
+char *getLocalIPv4Adress() {
+    char * ip= malloc(NI_MAXHOST + 1);
+    if (!ip) {
+        perror("[ERROR]: Could not allocate memory for ip address string");
+    }
+#ifdef _WIN32
+    WSADATA wsaData;
+    char name[255];
+    PHOSTENT hostinfo;
+    if ( WSAStartup( MAKEWORD( 2, 0 ), &wsaData ) == 0 ) {
+
+        if( gethostname ( name, sizeof(name)) == 0) {
+              if((hostinfo = gethostbyname(name)) != NULL) {
+                    ip = inet_ntoa (*(struct in_addr *)*hostinfo->h_addr_list);
+              }
+        }
+
+        WSACleanup( );
+    }
+#else
+    struct ifaddrs *ifaddr, *ifa;
+    int family, s;
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("getifaddrs");
+        exit(EXIT_FAILURE);
+    }
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL)
+            continue;
+
+        s=getnameinfo(ifa->ifa_addr,sizeof(struct sockaddr_in),ip, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+
+        if((strcmp(ifa->ifa_name,"wlan0")==0)&&(ifa->ifa_addr->sa_family==AF_INET)) {
+            if (s != 0) {
+                printf("getnameinfo() failed: %s\n", gai_strerror(s));
+                exit(EXIT_FAILURE);
+            }
+            printf("\tInterface : <%s>\n",ifa->ifa_name );
+            printf("\t  Address : <%s>\n", ip);
+        }
+    }
+    freeifaddrs(ifaddr);
+#endif
+    return ip;
+}
+
+
 int main( int argc, char *argv[] , char** envp) {
 
     printf("[INFO]: CK-crowdnode-server starting ...\n");
@@ -461,7 +513,8 @@ int main( int argc, char *argv[] , char** envp) {
     printf("\n");
     printf("[INFO for CK client]: server port:          %i\n", ckCrowdnodeServerConfig->port);
     printf("[INFO for CK client]: server path to files: %s\n", ckCrowdnodeServerConfig->pathToFiles);
-    printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);    
+    printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);
+    printf("[INFO for CK client]: real IP: %s\n", getLocalIPv4Adress());
     printf("\n");
 
     createCKFilesDirectoryIfDoesnotExist(getAbsolutePath(ckCrowdnodeServerConfig->pathToFiles, envp));
@@ -688,7 +741,7 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
     char *fileName = filenameJSON->valuestring;
     printf("[DEBUG]: File name: %s\n", fileName);
 
-    char *finalBaseDir = concat(baseDir,"/");
+    char *finalBaseDir = concat(baseDir, FILE_SEPARATOR);
 
     //  Optional param extra_path
     cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
@@ -698,7 +751,7 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
         printf("[INFO]: Extra path provided: %s\n", extraPath);
 
         finalBaseDir = concat(finalBaseDir, extraPath);
-        finalBaseDir = concat(finalBaseDir, "/");
+        finalBaseDir = concat(finalBaseDir, FILE_SEPARATOR);
         createCKFilesDirectoryIfDoesnotExist(finalBaseDir);
     }
 
@@ -778,7 +831,7 @@ void processPull(int sock, char* baseDir, cJSON* commandJSON) {
     char *fileName = filenameJSON->valuestring;
     printf("[DEBUG]: File name: %s\n", fileName);
 
-    char *finalBaseDir = concat(baseDir,"/");
+    char *finalBaseDir = concat(baseDir,FILE_SEPARATOR);
 
     //  Optional param extra_path
     cJSON *extraPathJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_EXTRA_PATH);
@@ -788,7 +841,7 @@ void processPull(int sock, char* baseDir, cJSON* commandJSON) {
         printf("[INFO]: Extra path provided: %s\n", extraPath);
 
         finalBaseDir = concat(finalBaseDir, extraPath);
-        finalBaseDir = concat(finalBaseDir, "/");
+        finalBaseDir = concat(finalBaseDir, FILE_SEPARATOR);
     }
 
     char *filePath = concat(finalBaseDir, fileName);
@@ -842,7 +895,7 @@ void processPull(int sock, char* baseDir, cJSON* commandJSON) {
     free(encodedContent);
 }
 
-void processShell(int sock, cJSON* commandJSON) {
+void processShell(int sock, cJSON* commandJSON, char *baseDir) {
     //  shell (to execute a binary at CK node)
     // todo implement:
     // 1) find local file by provided name - send JSON error if not found
@@ -866,6 +919,8 @@ void processShell(int sock, cJSON* commandJSON) {
         return;
     }
 
+    chdir(baseDir);
+
     int systemReturnCode = 0;
 
     char path[MAX_BUFFER_SIZE + 1];
@@ -876,12 +931,20 @@ void processShell(int sock, cJSON* commandJSON) {
     }
     memset(stdoutText, 0, MAX_BUFFER_SIZE + 1);
 
+    char tmpFilename[38];
+    get_uuid_string(tmpFilename, sizeof(tmpFilename));
+
+    char *tmpStdErrFilePath = concat(baseDir, FILE_SEPARATOR);
+    tmpStdErrFilePath = concat(tmpStdErrFilePath,tmpFilename);
+    char *redirectString = concat(" 2>", tmpStdErrFilePath);
+    char *shellCommandWithStdErr = concat(shellCommand, redirectString);
+    printf("[INFO]: Run command: %s\n", shellCommandWithStdErr);
     /* Open the command for reading. */
     FILE *fp;
 #ifdef _WIN32
-    fp = _popen(shellCommand, "r");
+    fp = _popen(shellCommandWithStdErr, "r");
 #else
-    fp = popen(shellCommand, "r");
+    fp = popen(shellCommandWithStdErr, "r");
 #endif
     if (fp == NULL) {
         printf("[ERROR]: Failed to run command: %s\n", shellCommand);
@@ -931,9 +994,52 @@ void processShell(int sock, cJSON* commandJSON) {
     cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
     cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(encodedContent));
-    cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(""));   //todo get stderr
+
+    long fsize = 0;
+    FILE *stdErrFile = fopen(tmpStdErrFilePath, "rb");
+    if (!stdErrFile) {
+        sendErrorMessage(sock, "can't find stderr tmp file", ERROR_CODE);
+        return;
+    }
+
+    unsigned char *stdErr = "";
+    if (stdErrFile) {
+        fseek(stdErrFile, 0, SEEK_END);
+        fsize = ftell(stdErrFile);
+        fseek(stdErrFile, 0, SEEK_SET);
+
+        stdErr = malloc(fsize + 1);
+        memset(stdErr, 0, fsize + 1);
+        fread(stdErr, fsize, 1, stdErrFile);
+        fclose(stdErrFile);
+    }
+    printf("[DEBUG]: stderr file size: %lu\n", fsize);
+
+    char *encodedStdErr = "";
+    if (fsize > 0) {
+        unsigned long targetSize = (unsigned long) ((fsize) * 4 / 3 + 5);
+        printf("[DEBUG]: Target stderr encoded size: %lu\n", targetSize);
+        encodedStdErr = malloc(targetSize);
+        if (!encodedStdErr) {
+            perror("[ERROR]: Memory not allocated for encoded stderr content\n");
+            exit(1);
+        }
+        memset(encodedStdErr, 0, targetSize);
+        base64_encode(stdErr, fsize, encodedStdErr, targetSize);
+        free(stdErr);
+    }
+
+    cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(encodedStdErr));
+
     sendJson(sock, resultJSON);
     cJSON_Delete(resultJSON);
+
+    int ret = remove(tmpStdErrFilePath);
+    if(ret == 0) {
+        printf("[INFO]: tmp stderr file %s deleted successfully", tmpStdErrFilePath);
+    } else {
+        perror("[ERROR]: unable to delete the tmp stderr file");
+    }
 }
 
 void doProcessing(int sock, char *baseDir) {
@@ -1037,7 +1143,7 @@ void doProcessing(int sock, char *baseDir) {
         } else if (strncmp(action, "pull", 4) == 0) {
             processPull(sock, baseDir, commandJSON);
         } else if (strncmp(action, "shell", 4) == 0) {
-            processShell(sock, commandJSON);
+            processShell(sock, commandJSON, baseDir);
         } else if (strncmp(action, "state", 4) == 0) {
             printf("[DEBUG]: Check run state by runUUID ");
             cJSON *params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
