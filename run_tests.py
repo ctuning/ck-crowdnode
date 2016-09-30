@@ -8,12 +8,17 @@ import sys
 import unittest
 import time
 import platform
+import argparse
 
 def safe_remove(fname):
     try:
         os.remove(fname)
     except Exception:
         pass
+
+arg_parser = argparse.ArgumentParser()
+arg_parser.add_argument('--server_executable', default='build/ck-crowdnode-server')
+args = arg_parser.parse_args()
 
 script_dir = os.path.dirname(os.path.realpath(__file__))
 os.chdir(script_dir)
@@ -48,7 +53,7 @@ else:
     node_env['HOME'] = script_dir
     shutil.copyfile(config_file_sample_linux, config_file)
 
-node_process = subprocess.Popen(['build/ck-crowdnode-server'], env=node_env)
+node_process = subprocess.Popen([args.server_executable], env=node_env)
 
 shutil.rmtree(ck_dir, ignore_errors=True)
 r = subprocess.call('git clone https://github.com/ctuning/ck.git ' + ck_dir, shell=True)
