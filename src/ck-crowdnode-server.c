@@ -16,9 +16,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <locale.h>
-#include <langinfo.h>
-
 #if defined(__linux__) || defined(__APPLE__)
     #include <unistd.h>
     #include <arpa/inet.h>
@@ -93,8 +90,6 @@ int WSAGetLastError() {
 	return 0;
 }
 #endif
-
-static const char* system_encoding;
 
 /**
  * Input: command in CK JSON format TDB
@@ -508,12 +503,6 @@ char *getLocalIPv4Adress() {
 int main( int argc, char *argv[] , char** envp) {
 
     printf("[INFO]: CK-crowdnode-server starting ...\n");
-
-    setlocale(LC_ALL, "");
-    system_encoding = nl_langinfo(CODESET);
-
-    printf("[INFO]: system encoding: %s\n", system_encoding);
-
     printf("[INFO]: %s env value: %s\n", HOME_DIR_TEMPLATE, getEnvValue(HOME_DIR_ENV_KEY, envp));
     printf("[INFO]: Configuration file absolute path: %s\n", getAbsolutePath(DEFAULT_CONFIG_FILE_PATH, envp));
     ckCrowdnodeServerConfig = malloc(sizeof(CKCrowdnodeServerConfig));
@@ -1011,8 +1000,6 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
     cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
 
     cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
-
-    cJSON_AddItemToObject(resultJSON, "encoding", cJSON_CreateString(system_encoding));
 
     cJSON_AddItemToObject(resultJSON, "stdout_base64", cJSON_CreateString(encodedContent));
 
