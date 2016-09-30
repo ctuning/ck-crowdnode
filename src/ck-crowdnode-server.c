@@ -20,6 +20,9 @@
     #include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
     #include <ctype.h>
 #include <sys/stat.h>
+#include <ifaddrs.h>
+#include <stropts.h>
+#include <sys/ioctl.h>
 
 #elif _WIN32
 #include <winsock2.h>
@@ -442,6 +445,53 @@ void loadDefaultConfig(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
     cJSON_Delete(defaultConfigJSON);
 }
 
+char *getLocalIPv4Adress() {
+    char * ip= malloc(NI_MAXHOST + 1);
+    if (!ip) {
+        perror("[ERROR]: Could not allocate memory for ip address string");
+    }
+#ifdef _WIN32
+    WSADATA wsaData;
+    char name[255];
+    PHOSTENT hostinfo;
+    if ( WSAStartup( MAKEWORD( 2, 0 ), &wsaData ) == 0 ) {
+
+        if( gethostname ( name, sizeof(name)) == 0) {
+              if((hostinfo = gethostbyname(name)) != NULL) {
+                    ip = inet_ntoa (*(struct in_addr *)*hostinfo->h_addr_list);
+              }
+        }
+
+        WSACleanup( );
+    }
+#else
+    struct ifaddrs *ifaddr, *ifa;
+    int family, s;
+    if (getifaddrs(&ifaddr) == -1) {
+        perror("getifaddrs");
+        exit(EXIT_FAILURE);
+    }
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+        if (ifa->ifa_addr == NULL)
+            continue;
+
+        s=getnameinfo(ifa->ifa_addr,sizeof(struct sockaddr_in),ip, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+
+        if((strcmp(ifa->ifa_name,"wlan0")==0)&&(ifa->ifa_addr->sa_family==AF_INET)) {
+            if (s != 0) {
+                printf("getnameinfo() failed: %s\n", gai_strerror(s));
+                exit(EXIT_FAILURE);
+            }
+            printf("\tInterface : <%s>\n",ifa->ifa_name );
+            printf("\t  Address : <%s>\n", ip);
+        }
+    }
+    freeifaddrs(ifaddr);
+#endif
+    return ip;
+}
+
+
 int main( int argc, char *argv[] , char** envp) {
 
     printf("[INFO]: CK-crowdnode-server starting ...\n");
@@ -463,7 +513,8 @@ int main( int argc, char *argv[] , char** envp) {
     printf("\n");
     printf("[INFO for CK client]: server port:          %i\n", ckCrowdnodeServerConfig->port);
     printf("[INFO for CK client]: server path to files: %s\n", ckCrowdnodeServerConfig->pathToFiles);
-    printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);    
+    printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);
+    printf("[INFO for CK client]: real IP: %s\n", getLocalIPv4Adress());
     printf("\n");
 
     createCKFilesDirectoryIfDoesnotExist(getAbsolutePath(ckCrowdnodeServerConfig->pathToFiles, envp));
