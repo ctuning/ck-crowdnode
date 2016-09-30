@@ -7,6 +7,10 @@
 # See Copyright.txt for copyright details.
 #
 # Developer: Daniil Efremov
+*
+* Contributors: Dmitry Savenko
+*               Grigori Fursin
+*              
  */
 #include <stdio.h>
 #include <string.h>
@@ -518,10 +522,10 @@ int main( int argc, char *argv[] , char** envp) {
     }
 
     printf("\n");
+    printf("[INFO for CK client]: server real IP:       %s\n", getLocalIPv4Adress());
     printf("[INFO for CK client]: server port:          %i\n", ckCrowdnodeServerConfig->port);
     printf("[INFO for CK client]: server path to files: %s\n", ckCrowdnodeServerConfig->pathToFiles);
     printf("[INFO for CK client]: secret key:           %s\n", ckCrowdnodeServerConfig->secretKey);
-    printf("[INFO for CK client]: real IP: %s\n", getLocalIPv4Adress());
     printf("\n");
 
     createCKFilesDirectoryIfDoesnotExist(getAbsolutePath(ckCrowdnodeServerConfig->pathToFiles, envp));
@@ -1000,7 +1004,7 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
 
     cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
-    cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(encodedContent));
+    cJSON_AddItemToObject(resultJSON, "stdout_base64", cJSON_CreateString(encodedContent));
 
     long fsize = 0;
     FILE *stdErrFile = fopen(tmpStdErrFilePath, "rb");
@@ -1036,16 +1040,16 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
         free(stdErr);
     }
 
-    cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(encodedStdErr));
+    cJSON_AddItemToObject(resultJSON, "stderr_base64", cJSON_CreateString(encodedStdErr));
 
     sendJson(sock, resultJSON);
     cJSON_Delete(resultJSON);
 
     int ret = remove(tmpStdErrFilePath);
     if(ret == 0) {
-        printf("[INFO]: tmp stderr file %s deleted successfully", tmpStdErrFilePath);
+        printf("[INFO]: tmp stderr file %s deleted successfully\n", tmpStdErrFilePath);
     } else {
-        perror("[ERROR]: unable to delete the tmp stderr file");
+        perror("[ERROR]: unable to delete the tmp stderr file\n");
     }
 }
 
