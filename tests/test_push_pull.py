@@ -56,5 +56,3 @@ class TestPushPull(unittest.TestCase):
         # check two times to make sure the server is OK
         r = access_test_repo({'action': 'push', 'filename': orig_file, 'extra_path': '11/21/31'}, checkFail=False)
         self.assertEqual(1, r['return'])
-
-        print(r)

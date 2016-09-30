@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
+project(ck-crowdnode-server)
+
 set(SRC
         src/net_uuid.h
         src/net_uuid.c
@@ -16,6 +18,9 @@ set(SRC
 add_executable(ck-crowdnode-server ${SRC})
 
 IF(WIN32)
+
+    install(targets ck-crowdnode-server destination .)
+
     target_link_libraries(ck-crowdnode-server ws2_32)
 
     set(CPACK_GENERATOR WIX)
