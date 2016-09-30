@@ -996,7 +996,7 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
 
     cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
-    cJSON_AddItemToObject(resultJSON, "stdout", cJSON_CreateString(encodedContent));
+    cJSON_AddItemToObject(resultJSON, "stdout_base64", cJSON_CreateString(encodedContent));
 
     long fsize = 0;
     FILE *stdErrFile = fopen(tmpStdErrFilePath, "rb");
@@ -1032,7 +1032,7 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
         free(stdErr);
     }
 
-    cJSON_AddItemToObject(resultJSON, "stderr", cJSON_CreateString(encodedStdErr));
+    cJSON_AddItemToObject(resultJSON, "stderr_base64", cJSON_CreateString(encodedStdErr));
 
     sendJson(sock, resultJSON);
     cJSON_Delete(resultJSON);

@@ -13,17 +13,17 @@ class TestPushPull(unittest.TestCase):
     def test_shell(self):
         cmd = 'dir C:\\' if 'Windows' == cfg['platform'] else 'ls -l /etc/'
         r = access_test_repo({'action': 'shell', 'cmd': cmd})
-        self.assertIn('stdout', r)
+        self.assertIn('stdout_base64', r)
         self.assertIn('return_code', r)
-        self.assertIn('stderr', r)
+        self.assertIn('stderr_base64', r)
 
 
     def test_shell_err(self):
         cmd = 'nodir C:\\' if 'Windows' == cfg['platform'] else 'nols -l /etc/'
         r = access_test_repo({'action': 'shell', 'cmd': cmd})
-        self.assertIn('stdout', r)
+        self.assertIn('stdout_base64', r)
         self.assertIn('return_code', r)
-        self.assertIn('stderr', r)
+        self.assertIn('stderr_base64', r)
 
     def test_non_latin(self):
         fname = 'non-latin.txt'
@@ -34,9 +34,9 @@ class TestPushPull(unittest.TestCase):
         base64_content = r['file_content_base64']
 
         r = access_test_repo({'action': 'shell', 'cmd': cmd})
-        self.assertEqual(base64_content, r['stdout'])
+        self.assertEqual(base64_content, r['stdout_base64'])
 
-        r = ck.convert_upload_string_to_file({'file_content_base64': r['stdout']})
+        r = ck.convert_upload_string_to_file({'file_content_base64': r['stdout_base64']})
         try:
             self.assertTrue(filecmp.cmp(fname, r['filename']))
         finally:
