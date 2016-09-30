@@ -20,21 +20,20 @@ Relatively stable - testing phase
 Usage: server side
 ==================
 Install and start latest version of ck-crowdnode-server 
-using "release\setup.exe"
-
-Note [INFO for CK client] - you will need it to configure
-this target machine on a client.
+using "release\setup.exe". Write down "[INFO for CK client]" - 
+you will require this info to configure this target machine 
+on a client.
 
 Usage: client side
 ==================
 Install [CK framework](http://github.com/ctuning/ck). 
 If you have PIP, you can install it simply as following:
 
-$ pip install ck
+ $ pip install ck
 
 Pull ck-autotuning repository (including dependencies):
 
-$ ck pull repo:ck-autotuning
+ $ ck pull repo:ck-autotuning
 
 Prepare local file with a secret key (see [INFO for CK client]),
 for example in C:\secret-key.txt
@@ -42,7 +41,7 @@ for example in C:\secret-key.txt
 Register target machine with ck-crowdnode-server via
 (substitute ''my-remote-target'' with any other user-friendly name)
 
-$ ck add machine:my-remote-target
+ $ ck add machine:my-remote-target
 
 Select 4) CK: remote Windows machine accessed via CK crowd node.
 Then 4) windows-64
@@ -52,23 +51,28 @@ and full path to files on a target machine (all info is available
 via [INFO for CK client] - we later plan to automate this process).
 
 Now you can check that you machine is connected and online via
-$ ck show machine
+
+ $ ck show machine
+
 or
-$ ck browse machine
+
+ $ ck browse machine
 
 Now you should be able to compile and run sample program using this target. 
 You need to have Microsoft C compilers and Microsoft SDK installed 
 (there is a free edition available). You can also download and install
-[http://llvm.org/releases/download.html LLVM for Windows], 
+[LLVM for Windows](http://llvm.org/releases/download.html), 
 but remember that it also requires Visual C compiler and Microsoft SDK.
 
 Try to compile susan benchmark (during first compilation, CK will attemt
 to automatically detect installed compilers and SDK while asking
 you extra questions, if needed):
-$ ck compile program:cbench-automotive-susan --speed --target=my-remote-target
+
+ $ ck compile program:cbench-automotive-susan --speed --target=my-remote-target
 
 Finally, you can try to run it:
-$ ck run program:cbench-automotive-susan --target=my-remote-target
+
+ $ ck run program:cbench-automotive-susan --target=my-remote-target
 
 If everything is configured correctly, this code will be executed several
 times on a required target and execution time will be reported!
