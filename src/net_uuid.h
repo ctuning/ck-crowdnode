@@ -1,6 +1,9 @@
 
 #include <stdint.h>
 
+#define DEFAULT_UUID_SIZE 38
+
+
 typedef uint64_t uuid_time_t;
 
 typedef struct {

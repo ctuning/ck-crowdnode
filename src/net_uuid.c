@@ -84,6 +84,7 @@
 
 #include "net_uuid.h"
 
+
 /* some forward declarations.  kind of wimpy to do that but heck, we
    are all friends here right?  raj 20081024 */
 static uint16_t true_random(void);
@@ -207,7 +208,7 @@ void snpuid(char *str, size_t size, netperf_uuid_t u) {
     int i;
     char *tmp = str;
 
-    if (size < 38) {
+    if (size < DEFAULT_UUID_SIZE) {
         snprintf(tmp,size,"%s","uuid string too small");
         return;
     }
@@ -339,7 +340,7 @@ int
 main(int argc, char *argv[])
 {
   netperf_uuid_t u;
-  char  uuid_str[38];
+  char  uuid_str[DEFAULT_UUID_SIZE];
 #if 0
   uuid_create(&u);
   printf("uuid_create(): "); puid(u);

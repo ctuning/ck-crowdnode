@@ -21,7 +21,6 @@
     #include <ctype.h>
 #include <sys/stat.h>
 #include <ifaddrs.h>
-#include <stropts.h>
 #include <sys/ioctl.h>
 
 #elif _WIN32
@@ -65,20 +64,21 @@ static char *const JSON_PARAM_SHELL_COMMAND = "cmd";
 #define MAX_BUFFER_SIZE 1024
 #define DEFAULT_SERVER_PORT 3333
 static const int MAXPENDING = 5;    /* Maximum outstanding connection requests */
+#define GENERATED_KEY_SIZE 8
 
 static char *const JSON_CONFIG_PARAM_PORT = "port";
 static char *const JSON_CONFIG_PARAM_PATH_TO_FILES = "path_to_files";
 static char *const JSON_CONFIG_PARAM_SECRET_KEY = "secret_key";
 
 #ifdef _WIN32
-static char *const DEFAULT_BASE_DIR = "%LOCALAPPDATA%/ck-crowdnode-files/";
-static char *const DEFAULT_CONFIG_DIR = "%LOCALAPPDATA%/.ck-crowdnode/";
-static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%/.ck-crowdnode/ck-crowdnode-config.json";
+static char *const DEFAULT_BASE_DIR = "%LOCALAPPDATA%\\ck-crowdnode-files";
+static char *const DEFAULT_CONFIG_DIR = "%LOCALAPPDATA%\\.ck-crowdnode\\";
+static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%\\.ck-crowdnode\\ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "%LOCALAPPDATA%";
 static char *const HOME_DIR_ENV_KEY = "LOCALAPPDATA";
 #define FILE_SEPARATOR "\\"
 #else
-static char *const DEFAULT_BASE_DIR = "$HOME/ck-crowdnode-files/";
+static char *const DEFAULT_BASE_DIR = "$HOME/ck-crowdnode-files";
 static char *const DEFAULT_CONFIG_DIR = "$HOME/.ck-crowdnode/";
 static char *const DEFAULT_CONFIG_FILE_PATH = "$HOME/.ck-crowdnode/ck-crowdnode-config.json";
 static char *const HOME_DIR_TEMPLATE = "$HOME";
@@ -393,15 +393,24 @@ int createCKFilesDirectoryIfDoesnotExist(char * dirPath) {
     return createDirState;
 }
 
+char * generateKey() {
+    int uuidSize = DEFAULT_UUID_SIZE;
+    if (GENERATED_KEY_SIZE > DEFAULT_UUID_SIZE) {
+        uuidSize = GENERATED_KEY_SIZE;
+    }
+    char * generatedSecretKey = malloc(uuidSize + sizeof(char));
+    get_uuid_string(generatedSecretKey, uuidSize);
+    char *secretKey = malloc(GENERATED_KEY_SIZE + sizeof(char));
+    memset(secretKey, 0, GENERATED_KEY_SIZE);
+    strncpy(secretKey, generatedSecretKey, GENERATED_KEY_SIZE);
+    secretKey[GENERATED_KEY_SIZE] = '\0';
+    return secretKey;
+}
+
 void loadDefaultConfig(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** envp) {
     ckCrowdnodeServerConfig->port = DEFAULT_SERVER_PORT;
     ckCrowdnodeServerConfig->pathToFiles = getAbsolutePath(DEFAULT_BASE_DIR, envp);
-    char generatedSecretKey[38];
-    get_uuid_string(generatedSecretKey, sizeof(generatedSecretKey));
-    size_t generatedSecretKeySize = strlen(generatedSecretKey) + sizeof(char);
-    ckCrowdnodeServerConfig->secretKey = malloc(generatedSecretKeySize);
-    memset(ckCrowdnodeServerConfig->secretKey, 0, generatedSecretKeySize);
-    strcpy(ckCrowdnodeServerConfig->secretKey, generatedSecretKey);
+    ckCrowdnodeServerConfig->secretKey = generateKey();
 
     char *configDir = getAbsolutePath(DEFAULT_CONFIG_DIR, envp);
     int createDirState = 0;
@@ -425,9 +434,7 @@ void loadDefaultConfig(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
         exit(1);
     }
 
-    char *defaultCrowdnodeServerConfig = malloc(generatedSecretKeySize);
-    memset(defaultCrowdnodeServerConfig, 0, generatedSecretKeySize);
-    strcpy(defaultCrowdnodeServerConfig, generatedSecretKey);
+    char *defaultCrowdnodeServerConfig = strdup(ckCrowdnodeServerConfig->secretKey);
     cJSON_AddNumberToObject(defaultConfigJSON, JSON_CONFIG_PARAM_PORT, DEFAULT_SERVER_PORT);
     cJSON_AddItemToObject(defaultConfigJSON, JSON_CONFIG_PARAM_PATH_TO_FILES, cJSON_CreateString(getAbsolutePath(DEFAULT_BASE_DIR, envp)));
     cJSON_AddItemToObject(defaultConfigJSON, JSON_CONFIG_PARAM_SECRET_KEY, cJSON_CreateString(defaultCrowdnodeServerConfig));
@@ -804,7 +811,7 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
      * return successful response message, example:
      *   {"return":0, "compileUUID": <generated UID>}
      */
-    // char compileUUID[38];
+    // char compileUUID[DEFAULT_UUID_SIZE];
     // get_uuid_string(compileUUID, sizeof(compileUUID));
 
     cJSON *resultJSON = cJSON_CreateObject();
@@ -931,7 +938,7 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
     }
     memset(stdoutText, 0, MAX_BUFFER_SIZE + 1);
 
-    char tmpFilename[38];
+    char tmpFilename[DEFAULT_UUID_SIZE];
     get_uuid_string(tmpFilename, sizeof(tmpFilename));
 
     char *tmpStdErrFilePath = concat(baseDir, FILE_SEPARATOR);
