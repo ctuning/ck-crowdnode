@@ -1,6 +1,7 @@
 
 import filecmp
 import unittest
+import base64
 
 # The following variables are initialized by test runner
 ck=None                 # CK kernel
@@ -52,4 +53,30 @@ class TestPushPull(unittest.TestCase):
             try:
                 os.remove(tmp_file)
             except: pass
+
+    def test_non_latin_encoding(self):
+        fname = 'non-latin.txt.win' if 'Windows' == cfg['platform'] else 'non-latin.txt'
+        fenc = '1252' if 'Windows' == cfg['platform'] else 'utf8'
+
+        rl = ck.load_text_file({'text_file':fname, 'encoding':fenc})
+        fcontent = rl['string']
+        access_test_repo({'action': 'push', 'filename': fname})
+        cmd = 'type ' + fname if 'Windows' == cfg['platform'] else 'cat ' + fname
+        r = access_test_repo({'action': 'shell', 'cmd': cmd})
+
+        xso=str(r.get('stdout_base64',''))
+        enc=r.get('encoding','')
+        so=''
+        if xso!='':
+            so=base64.urlsafe_b64decode(xso, )
+            if type(so)==bytes:
+                so=so.decode(encoding=enc, errors='ignore')
+        try:
+            self.assertEquals(fcontent, so)
+        finally:
+            try:
+                os.remove(tmp_file)
+            except: pass
+
+
 

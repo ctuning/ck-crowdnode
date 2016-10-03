@@ -49,6 +49,8 @@
 #include "urldecoder.h"
 #include "net_uuid.h"
 
+#include <locale.h>
+
 static char *const CK_JSON_KEY = "ck_json=";
 
 static char *const JSON_PARAM_NAME_COMMAND = "action";
@@ -499,10 +501,22 @@ char *getLocalIPv4Adress() {
     return ip;
 }
 
+char * getStdoutEncoding() {
+    setlocale (LC_ALL, "");
+    char *currentLocale = setlocale(LC_ALL, NULL);
+    char *encoding;
+    char *encodingWithDot = strstr(currentLocale, ".");
+    if (encodingWithDot != NULL) {
+        encoding = encodingWithDot + sizeof(char);
+        return strdup(encoding);
+    }
+    return NULL;
+}
 
 int main( int argc, char *argv[] , char** envp) {
 
     printf("[INFO]: CK-crowdnode-server starting ...\n");
+    printf("[INFO]: Server default encoding: %s\n", getStdoutEncoding());
     printf("[INFO]: %s env value: %s\n", HOME_DIR_TEMPLATE, getEnvValue(HOME_DIR_ENV_KEY, envp));
     printf("[INFO]: Configuration file absolute path: %s\n", getAbsolutePath(DEFAULT_CONFIG_FILE_PATH, envp));
     ckCrowdnodeServerConfig = malloc(sizeof(CKCrowdnodeServerConfig));
@@ -1001,6 +1015,7 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
 
     cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
+    cJSON_AddItemToObject(resultJSON, "encoding", cJSON_CreateString(getStdoutEncoding()));
     cJSON_AddItemToObject(resultJSON, "stdout_base64", cJSON_CreateString(encodedContent));
 
     long fsize = 0;
@@ -1081,7 +1096,6 @@ void doProcessing(int sock, char *baseDir) {
             buffer[buffer_read] = '\0';
             memcpy(client_message + total_read, buffer, buffer_read);
             total_read = total_read + buffer_read;
-            printf("Next %i part of buffer\n", i);
             i++;
             if (-1 == message_len) {
                 message_len = detectMessageLength(buffer, total_read);
