@@ -363,7 +363,7 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
         return 0;
     }
     char *pathToFiles = getAbsolutePath(pathSON->valuestring, envp);
-    ckCrowdnodeServerConfig->pathToFiles = concat(pathToFiles, FILE_SEPARATOR);
+    ckCrowdnodeServerConfig->pathToFiles = strdup(pathToFiles);
 
     char * secretKey;
     cJSON *secretKeyJSON = cJSON_GetObjectItem(configSON, JSON_CONFIG_PARAM_SECRET_KEY);
@@ -1065,6 +1065,14 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
     }
 }
 
+void processState(int sock, const char *baseDir) {
+    cJSON *resultJSON = cJSON_CreateObject();
+    cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
+    cJSON_AddItemToObject(resultJSON, JSON_CONFIG_PARAM_PATH_TO_FILES, cJSON_CreateString(strdup(baseDir)));
+    sendJson(sock, resultJSON);
+    cJSON_Delete(resultJSON);
+}
+
 void doProcessing(int sock, char *baseDir) {
     char *client_message = malloc(MAX_BUFFER_SIZE + 1);
     if (client_message == NULL) {
@@ -1167,17 +1175,7 @@ void doProcessing(int sock, char *baseDir) {
         } else if (strncmp(action, "shell", 4) == 0) {
             processShell(sock, commandJSON, baseDir);
         } else if (strncmp(action, "state", 4) == 0) {
-            printf("[DEBUG]: Check run state by runUUID ");
-            cJSON *params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
-            char *runUUID = cJSON_GetObjectItem(params, "runUUID")->valuestring;
-            printf("[DEBUG]: runUUID: %s\n", runUUID);
-
-            //todo implement get actual runing state by runUUID
-
-            cJSON *resultJSON = cJSON_CreateObject();
-            cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-            sendJson(sock, resultJSON);
-            cJSON_Delete(resultJSON);
+            processState(sock, baseDir);
         } else if (strncmp(action, "clear", 4) == 0) {
             printf("[DEBUG]: Clearing tmp files ...");
             // todo implement removing all temporary files saved localy but need check some process could be in running state

@@ -102,6 +102,7 @@ class CkTestLoader(unittest.TestLoader):
         module.ck = ck
         module.cfg = module_cfg
         module.access_test_repo = access_test_repo
+        module.files_dir = files_dir
         return unittest.TestLoader.loadTestsFromModule(self, module, pattern)
 
 suite = CkTestLoader().discover(tests_dir, pattern='test_*.py')
