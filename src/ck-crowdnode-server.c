@@ -80,6 +80,7 @@ static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%\\.ck-crowdnode\\ck
 static char *const HOME_DIR_TEMPLATE = "%LOCALAPPDATA%";
 static char *const HOME_DIR_ENV_KEY = "LOCALAPPDATA";
 #define FILE_SEPARATOR "\\"
+#define FILE_SEPARATOR_CHAR '\\'
 #else
 static char *const DEFAULT_BASE_DIR = "$HOME/ck-crowdnode-files";
 static char *const DEFAULT_CONFIG_DIR = "$HOME/.ck-crowdnode/";
@@ -87,6 +88,7 @@ static char *const DEFAULT_CONFIG_FILE_PATH = "$HOME/.ck-crowdnode/ck-crowdnode-
 static char *const HOME_DIR_TEMPLATE = "$HOME";
 static char *const HOME_DIR_ENV_KEY = "HOME";
 #define FILE_SEPARATOR "/"
+#define FILE_SEPARATOR_CHAR '/'
 
 int WSAGetLastError() {
 	return 0;
@@ -384,16 +386,22 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
     return 1;
 }
 
-int createCKFilesDirectoryIfDoesnotExist(char * dirPath) {
-    int createDirState = 0;
-    printf("[INFO]: Check CK crowdnode server files directory: %s\n", dirPath);
-    createDirState = mkdir(dirPath, DEFAULT_DIR_MODE);
-    if (createDirState<0) {
-        perror("[WARN]: Directory was not created");
-    } else {
-        printf("[INFO]: CK crowdnode server files directory created: %s\n", dirPath);
-    }
-    return createDirState;
+void createCKFilesDirectoryIfDoesnotExist(const char *dir) {
+    char *p = NULL;
+    size_t len;
+
+    char *tmp = strdup(dir);
+    len = strlen(tmp);
+    if(tmp[len - 1] == FILE_SEPARATOR_CHAR)
+        tmp[len - 1] = 0;
+    for(p = tmp + 1; *p; p++)
+        if(*p == FILE_SEPARATOR_CHAR) {
+            *p = 0;
+            mkdir(tmp, DEFAULT_DIR_MODE);
+            *p = FILE_SEPARATOR_CHAR;
+        }
+    mkdir(tmp, DEFAULT_DIR_MODE);
+    free(tmp);
 }
 
 char * generateKey() {

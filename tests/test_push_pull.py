@@ -49,10 +49,16 @@ class TestPushPull(unittest.TestCase):
             except: pass
 
     def test_extra_path_2(self):
+        extra_path1 = '1\\2\\3' if 'Windows' == cfg['platform'] else '1/2/3'
+        extra_path2 = '11\\22\\33\\44' if 'Windows' == cfg['platform'] else '11/22/33/44'
+
         orig_file = 'ck-master.zip'
-        r = access_test_repo({'action': 'push', 'filename': orig_file, 'extra_path': '1/2/3'}, checkFail=False)
-        self.assertEqual(1, r['return'])
+        r = access_test_repo({'action': 'push', 'filename': orig_file, 'extra_path': extra_path1}, checkFail=False)
+        self.assertEqual(0, r['return'])
 
         # check two times to make sure the server is OK
-        r = access_test_repo({'action': 'push', 'filename': orig_file, 'extra_path': '11/21/31'}, checkFail=False)
-        self.assertEqual(1, r['return'])
+        r = access_test_repo({'action': 'push', 'filename': orig_file, 'extra_path': extra_path2}, checkFail=False)
+        self.assertEqual(0, r['return'])
+
+
+
