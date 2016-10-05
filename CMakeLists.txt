@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
+project(ck-crowdnode)
+
 set(SRC
         src/net_uuid.h
         src/net_uuid.c
@@ -19,15 +21,18 @@ IF(WIN32)
 
     target_link_libraries(ck-crowdnode-server ws2_32)
 
-    include(InstallRequiredSystemLibraries)
+    install( TARGETS ck-crowdnode-server RUNTIME DESTINATION bin COMPONENT Applications)
 
-    install( TARGETS ck-crowdnode-server DESTINATION bin )
-    install( FILES ${CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS} DESTINATION bin COMPONENT Libraries )
-
-    set(CPACK_GENERATOR WIX)
+    set(CPACK_GENERATOR NSIS)
     set(CPACK_PACKAGE_NAME "ck-crowdnode-server")
+    set(CPACK_PACKAGE_VENDOR "cTuning.org")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "CK crowd-node server")
     set(CPACK_PACKAGE_VERSION "0.0.1")
+    set(CPACK_PACKAGE_VERSION_MAJOR "0")
+    set(CPACK_PACKAGE_VERSION_MINOR "0")
+    set(CPACK_PACKAGE_VERSION_PATCH "1")
+    set(CPACK_PACKAGE_INSTALL_DIRECTORY "CK crowd-node server")
+    SET(CPACK_NSIS_MODIFY_PATH ON)
 
     INCLUDE(CPack)
 

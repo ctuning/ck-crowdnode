@@ -20,3 +20,6 @@ artifacts:
 
     - path: build/*.msi
       name: CK Crowdnode Server installer
+
+    - path: build/*.exe
+      name: CK Crowdnode Server installer EXE
