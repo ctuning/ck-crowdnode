@@ -11,7 +11,7 @@
 * Contributors: Dmitry Savenko
 *               Grigori Fursin
 *              
- */
+*/
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -61,9 +61,6 @@ static char *const JSON_PARAM_FILE_CONTENT = "file_content_base64";
 static char *const JSON_PARAM_EXTRA_PATH = "extra_path";
 static char *const JSON_PARAM_SHELL_COMMAND = "cmd";
 
-/**
- * todo move out to config /etc/ck-crowdnode/ck-crowdnode.properties
- */
 #define MAX_BUFFER_SIZE 1024
 #define DEFAULT_SERVER_PORT 3333
 static const int MAXPENDING = 5;    /* Maximum outstanding connection requests */
@@ -102,40 +99,35 @@ int WSAGetLastError() {
  * Examples:
  * push command
  *   input JSON:
- *     {"command":"push", "parameters": {"filename":"file1", "data":"<base64 encoded binary file data >"} }
+ *     {"command":"push", "parameters": {"secret_key":"<secret key from config file ck-crowdnode-config.json>", "filename":"file1", "file_content_base64":"<base64 URL safe encoded binary file data >"} }
  *
  *   output result JSON:
- *     {"state":"finished", "compileUUID":"567567567567567"}
- *
- * run command
- *   input JSON:
- *     {"command":"run", "parameters":{"compileUUID":"567567567567567"} }
- *
- *   output result JSON:
- *     {"state":"in progress", "runUUID":"12312312323213"}
- *     {"state":"finished ok"}
- *     {"state":"finished error", "errorMessage":"File not found"}
- *
- * state command
- *   input JSON:
- *     {"command":"state", "parameters":{"runUUID":"12312312323213"} }
- *
- *   output result JSON:
- *     {"state":"in progress"}
- *     {"state":"finished ok"}
- *     {"state":"finished error", "errorMessage":"File not found"}
+ *     {"result":"0"}
  *
  * pull command
  *   input JSON:
- *     {"command":"pull", "parameters":{"runUUID":"12312312323213"}}
+ *     {"command":"pull", "parameters": {"secret_key":"<secret key from config file ck-crowdnode-config.json>", "filename":"file1"}}
  *
  *   output result JSON:
- *     {"state":"finished", "parameters": {"filename":"file1", "data":"<base64 encoded binary file data >"} }
+ *     {"result":"0", "filename":"file1", "file_content_base64":"<base64 URL safe encoded binary file data >"}
  *
+ * shell command
+ *   input JSON:
+ *     {"command":"shell", parameters": {"secret_key":"<secret key from config file ck-crowdnode-config.json>", "cmd":"<shell commmand string, depend on ck node OS>" }}
+ *
+ *   output result JSON:
+ *     {"return":"0","return_code":256,"encoding":"UTF-8","stdout_base64":"","stderr_base64":"Y2F0OiBydXMudHh0OiBObyBzdWNoIGZpbGUgb3IgZGlyZWN0b3J5Cg=="}
+ *
+ * state command
+ *   input JSON:
+ *     {"return":"0", "parameters":{"secret_key":"<secret key from config file ck-crowdnode-config.json>"}}
+ *
+ *   output result JSON:
+ *     {"path_to_files":"/home/user/ck-crowdnode-files"}
  *
  * todo list:
- * 2) Check/Implement concurrent execution - looks like thread fors well at linus and windows as well
- * 3) Implement "shell' commnad
+ * - Check/Implement concurrent execution - looks like thread fors well at linus and windows as well
+ * - asynch checll command execution
  */
 
 void doProcessing(int sock, char *baseDir);
@@ -834,9 +826,6 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
      * return successful response message, example:
      *   {"return":0, "compileUUID": <generated UID>}
      */
-    // char compileUUID[DEFAULT_UUID_SIZE];
-    // get_uuid_string(compileUUID, sizeof(compileUUID));
-
     cJSON *resultJSON = cJSON_CreateObject();
     if (!resultJSON) {
         perror("[ERROR]: Memory not allocated for resultJSON");
@@ -844,7 +833,6 @@ void processPush(int sock, char* baseDir, cJSON* commandJSON) {
     }
     printf("[INFO]: resultJSON created\n");
     cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-    // cJSON_AddItemToObject(resultJSON, "compileUUID", cJSON_CreateString(compileUUID));
     sendJson(sock, resultJSON);
     cJSON_Delete(resultJSON);
 }
@@ -926,13 +914,8 @@ void processPull(int sock, char* baseDir, cJSON* commandJSON) {
 }
 
 void processShell(int sock, cJSON* commandJSON, char *baseDir) {
-    //  shell (to execute a binary at CK node)
-    // todo implement:
-    // 1) find local file by provided name - send JSON error if not found
-    // 2) generate run ID
-    // 3) fork new process for async execute
-    // 3) return run UUID as JSON sync with run UID and send to client
-    // 4) in async process convert to JSON with ru UID and send to client
+    //  shell (to execute a shell cmd from request at CK node)
+    // todo: in future could be implemented as async process
 
     cJSON *shellCommandJSON = cJSON_GetObjectItem(commandJSON, JSON_PARAM_SHELL_COMMAND);
     if (!shellCommandJSON) {
@@ -1184,11 +1167,6 @@ void doProcessing(int sock, char *baseDir) {
             processShell(sock, commandJSON, baseDir);
         } else if (strncmp(action, "state", 4) == 0) {
             processState(sock, baseDir);
-        } else if (strncmp(action, "clear", 4) == 0) {
-            printf("[DEBUG]: Clearing tmp files ...");
-            // todo implement removing all temporary files saved localy but need check some process could be in running state
-            // so need to discus how it should work
-            sendHttpResponse(sock, 200, "", 0);
         } else if (strncmp(action, "shutdown", 4) == 0) {
             printf("[DEBUG]: Start shutdown CK node");
             sendHttpResponse(sock, 200, "", 0);
