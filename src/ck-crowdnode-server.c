@@ -49,6 +49,8 @@
 #include "urldecoder.h"
 #include "net_uuid.h"
 
+#include <locale.h>
+
 static char *const CK_JSON_KEY = "ck_json=";
 
 static char *const JSON_PARAM_NAME_COMMAND = "action";
@@ -78,6 +80,7 @@ static char *const DEFAULT_CONFIG_FILE_PATH = "%LOCALAPPDATA%\\.ck-crowdnode\\ck
 static char *const HOME_DIR_TEMPLATE = "%LOCALAPPDATA%";
 static char *const HOME_DIR_ENV_KEY = "LOCALAPPDATA";
 #define FILE_SEPARATOR "\\"
+#define FILE_SEPARATOR_CHAR '\\'
 #else
 static char *const DEFAULT_BASE_DIR = "$HOME/ck-crowdnode-files";
 static char *const DEFAULT_CONFIG_DIR = "$HOME/.ck-crowdnode/";
@@ -85,6 +88,7 @@ static char *const DEFAULT_CONFIG_FILE_PATH = "$HOME/.ck-crowdnode/ck-crowdnode-
 static char *const HOME_DIR_TEMPLATE = "$HOME";
 static char *const HOME_DIR_ENV_KEY = "HOME";
 #define FILE_SEPARATOR "/"
+#define FILE_SEPARATOR_CHAR '/'
 
 int WSAGetLastError() {
 	return 0;
@@ -361,7 +365,7 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
         return 0;
     }
     char *pathToFiles = getAbsolutePath(pathSON->valuestring, envp);
-    ckCrowdnodeServerConfig->pathToFiles = concat(pathToFiles, FILE_SEPARATOR);
+    ckCrowdnodeServerConfig->pathToFiles = strdup(pathToFiles);
 
     char * secretKey;
     cJSON *secretKeyJSON = cJSON_GetObjectItem(configSON, JSON_CONFIG_PARAM_SECRET_KEY);
@@ -382,16 +386,22 @@ int loadConfigFromFile(CKCrowdnodeServerConfig *ckCrowdnodeServerConfig, char** 
     return 1;
 }
 
-int createCKFilesDirectoryIfDoesnotExist(char * dirPath) {
-    int createDirState = 0;
-    printf("[INFO]: Check CK crowdnode server files directory: %s\n", dirPath);
-    createDirState = mkdir(dirPath, DEFAULT_DIR_MODE);
-    if (createDirState<0) {
-        perror("[WARN]: Directory was not created");
-    } else {
-        printf("[INFO]: CK crowdnode server files directory created: %s\n", dirPath);
-    }
-    return createDirState;
+void createCKFilesDirectoryIfDoesnotExist(const char *dir) {
+    char *p = NULL;
+    size_t len;
+
+    char *tmp = strdup(dir);
+    len = strlen(tmp);
+    if(tmp[len - 1] == FILE_SEPARATOR_CHAR)
+        tmp[len - 1] = 0;
+    for(p = tmp + 1; *p; p++)
+        if(*p == FILE_SEPARATOR_CHAR) {
+            *p = 0;
+            mkdir(tmp, DEFAULT_DIR_MODE);
+            *p = FILE_SEPARATOR_CHAR;
+        }
+    mkdir(tmp, DEFAULT_DIR_MODE);
+    free(tmp);
 }
 
 char * generateKey() {
@@ -499,10 +509,22 @@ char *getLocalIPv4Adress() {
     return ip;
 }
 
+char * getStdoutEncoding() {
+    setlocale (LC_ALL, "");
+    char *currentLocale = setlocale(LC_ALL, NULL);
+    char *encoding;
+    char *encodingWithDot = strstr(currentLocale, ".");
+    if (encodingWithDot != NULL) {
+        encoding = encodingWithDot + sizeof(char);
+        return strdup(encoding);
+    }
+    return NULL;
+}
 
 int main( int argc, char *argv[] , char** envp) {
 
     printf("[INFO]: CK-crowdnode-server starting ...\n");
+    printf("[INFO]: Server default encoding: %s\n", getStdoutEncoding());
     printf("[INFO]: %s env value: %s\n", HOME_DIR_TEMPLATE, getEnvValue(HOME_DIR_ENV_KEY, envp));
     printf("[INFO]: Configuration file absolute path: %s\n", getAbsolutePath(DEFAULT_CONFIG_FILE_PATH, envp));
     ckCrowdnodeServerConfig = malloc(sizeof(CKCrowdnodeServerConfig));
@@ -1001,6 +1023,7 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
 
     cJSON_AddNumberToObject(resultJSON, "return_code", systemReturnCode);
 
+    cJSON_AddItemToObject(resultJSON, "encoding", cJSON_CreateString(getStdoutEncoding()));
     cJSON_AddItemToObject(resultJSON, "stdout_base64", cJSON_CreateString(encodedContent));
 
     long fsize = 0;
@@ -1050,6 +1073,14 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
     }
 }
 
+void processState(int sock, const char *baseDir) {
+    cJSON *resultJSON = cJSON_CreateObject();
+    cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
+    cJSON_AddItemToObject(resultJSON, JSON_CONFIG_PARAM_PATH_TO_FILES, cJSON_CreateString(strdup(baseDir)));
+    sendJson(sock, resultJSON);
+    cJSON_Delete(resultJSON);
+}
+
 void doProcessing(int sock, char *baseDir) {
     char *client_message = malloc(MAX_BUFFER_SIZE + 1);
     if (client_message == NULL) {
@@ -1081,7 +1112,6 @@ void doProcessing(int sock, char *baseDir) {
             buffer[buffer_read] = '\0';
             memcpy(client_message + total_read, buffer, buffer_read);
             total_read = total_read + buffer_read;
-            printf("Next %i part of buffer\n", i);
             i++;
             if (-1 == message_len) {
                 message_len = detectMessageLength(buffer, total_read);
@@ -1153,17 +1183,7 @@ void doProcessing(int sock, char *baseDir) {
         } else if (strncmp(action, "shell", 4) == 0) {
             processShell(sock, commandJSON, baseDir);
         } else if (strncmp(action, "state", 4) == 0) {
-            printf("[DEBUG]: Check run state by runUUID ");
-            cJSON *params = cJSON_GetObjectItem(commandJSON, JSON_PARAM_PARAMS);
-            char *runUUID = cJSON_GetObjectItem(params, "runUUID")->valuestring;
-            printf("[DEBUG]: runUUID: %s\n", runUUID);
-
-            //todo implement get actual runing state by runUUID
-
-            cJSON *resultJSON = cJSON_CreateObject();
-            cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-            sendJson(sock, resultJSON);
-            cJSON_Delete(resultJSON);
+            processState(sock, baseDir);
         } else if (strncmp(action, "clear", 4) == 0) {
             printf("[DEBUG]: Clearing tmp files ...");
             // todo implement removing all temporary files saved localy but need check some process could be in running state

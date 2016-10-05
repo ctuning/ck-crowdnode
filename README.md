@@ -106,4 +106,4 @@ Further details
 ===============
 * https://github.com/ctuning/ck
 * https://github.com/ctuning/ck/wiki/Publications
-* https://github.com/ctuning/ck/wiki/Farms-of-machines
+* https://github.com/ctuning/ck/wiki/Farms-of-CK-machines
