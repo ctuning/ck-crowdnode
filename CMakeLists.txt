@@ -21,7 +21,7 @@ IF(WIN32)
 
     target_link_libraries(ck-crowdnode-server ws2_32)
 
-    install( TARGETS ck-crowdnode-server RUNTIME DESTINATION bin COMPONENT Applications)
+    install( TARGETS ck-crowdnode-server RUNTIME DESTINATION . COMPONENT Applications)
 
     include(InstallRequiredSystemLibraries)
 
