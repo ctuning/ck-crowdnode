@@ -36,9 +36,9 @@ IF(WIN32)
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "CK crowd-node server")
     set(CPACK_NSIS_MODIFY_PATH ON)
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}\\\\LICENSE.txt")
-    set(CPACK_INSTALL_COMMANDS "!define MUI_ICON \\\"${CMAKE_CURRENT_SOURCE_DIR}\\\\icon.ico\\\"")
+    set(CPACK_PACKAGE_ICON "${CMAKE_CURRENT_SOURCE_DIR}\\\\icon.ico")
 
-    INCLUDE(CPack)
+    include(CPack)
 
 ELSE(WIN32)
     target_link_libraries(ck-crowdnode-server m)
