@@ -23,6 +23,8 @@ IF(WIN32)
 
     install( TARGETS ck-crowdnode-server RUNTIME DESTINATION bin COMPONENT Applications)
 
+    include(InstallRequiredSystemLibraries)
+
     set(CPACK_GENERATOR NSIS)
     set(CPACK_PACKAGE_NAME "ck-crowdnode-server")
     set(CPACK_PACKAGE_VENDOR "cTuning.org")
