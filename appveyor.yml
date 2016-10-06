@@ -9,10 +9,8 @@ build_script:
     - cd build
     - cmake ..
     - cmake --build . --config Release --target PACKAGE
-    - cp Release/ck-crowdnode-server.exe .
     - cd ..
-    - "%PYTHON%/python.exe -m run_tests.py"
-    - rm ck-crowdnode-server.exe
+    - "%PYTHON%/python.exe -m run_tests.py --server_executable build/Release/ck-crowdnode-server.exe"
 
 artifacts:
     - path: build/*.exe
