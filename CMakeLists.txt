@@ -21,7 +21,7 @@ IF(WIN32)
 
     target_link_libraries(ck-crowdnode-server ws2_32)
 
-    install( TARGETS ck-crowdnode-server RUNTIME DESTINATION . COMPONENT Applications)
+    install( TARGETS ck-crowdnode-server RUNTIME DESTINATION bin COMPONENT Applications)
 
     include(InstallRequiredSystemLibraries)
 
@@ -34,7 +34,9 @@ IF(WIN32)
     set(CPACK_PACKAGE_VERSION_MINOR "0")
     set(CPACK_PACKAGE_VERSION_PATCH "1")
     set(CPACK_PACKAGE_INSTALL_DIRECTORY "CK crowd-node server")
-    SET(CPACK_NSIS_MODIFY_PATH ON)
+    set(CPACK_NSIS_MODIFY_PATH ON)
+    set(CPACK_RESOURCE_FILE_LICENSE LICENSE.txt)
+    set(CPACK_INSTALL_COMMANDS "!define MUI_ICON \\\"icon.ico\\\"")
 
     INCLUDE(CPack)
 
