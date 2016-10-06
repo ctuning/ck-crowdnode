@@ -12,10 +12,8 @@ build_script:
     - cp Release/ck-crowdnode-server.exe .
     - cd ..
     - "%PYTHON%/python.exe -m run_tests.py"
+    - rm ck-crowdnode-server.exe
 
 artifacts:
-    - path: build/Release/ck-crowdnode-server.exe
-      name: CK Crowdnode Server Executable
-
     - path: build/*.exe
       name: CK Crowdnode Server installer
