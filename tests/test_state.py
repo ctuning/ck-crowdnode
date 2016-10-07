@@ -12,8 +12,9 @@ class TestPushPull(unittest.TestCase):
 
     def test_state(self):
         r = access_test_repo({'action': 'state'})
-        self.assertIn('path_to_files', r)
-        self.assertEqual(files_dir, r['path_to_files'])
+        cfg_ = r['cfg']
+        self.assertIn('path_to_files', cfg_)
+        self.assertEqual(files_dir, cfg_['path_to_files'])
         self.assertIn('return', r)
         self.assertEqual(0, r['return'])
 
