@@ -8,15 +8,10 @@ build_script:
     - mkdir build
     - cd build
     - cmake ..
-    # - msbuild /p:Configuration=Release /p:Platform=Win32 C:/projects/ck-crowdnode/build/Project.sln
     - cmake --build . --config Release --target PACKAGE
-    - cp Release/ck-crowdnode-server.exe .
     - cd ..
-    - "%PYTHON%/python.exe -m run_tests.py"
+    - "%PYTHON%/python.exe -m run_tests.py --server_executable build/Release/ck-crowdnode-server.exe"
 
 artifacts:
-    - path: build/Release/ck-crowdnode-server.exe
-      name: CK Crowdnode Server Executable
-
-    - path: build/*.msi
+    - path: build/*.exe
       name: CK Crowdnode Server installer

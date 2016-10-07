@@ -27,10 +27,24 @@ Relatively stable - testing phase
 
 Usage: server side
 ==================
-Install and start latest version of ck-crowdnode-server 
-using "release\setup.exe". Write down "[INFO for CK client]" - 
-you will require this info to configure this target machine 
-on a client.
+On Windows:
+
+1. Download the installer from [Appveyor](https://ci.appveyor.com/project/gfursin/ck-crowdnode/build/artifacts)
+
+2. Install and start "CK crowd-node server".
+
+3. Write down "[INFO for CK client]" - you will require this info to configure this target machine on a client.
+
+Alternatively, you can build it manually (you'll need CMake and Visual Studio):
+
+```
+mkdir build
+cd build
+cmake ..
+cmake --build . --config Release --target PACKAGE
+```
+
+Now, you should be able to run `build/Release/ck-crowdnode-server.exe`.
 
 Usage: client side
 ==================
