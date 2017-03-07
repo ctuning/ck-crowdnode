@@ -121,3 +121,9 @@ Further details
 * https://github.com/ctuning/ck
 * https://github.com/ctuning/ck/wiki/Publications
 * https://github.com/ctuning/ck/wiki/Farms-of-CK-machines
+
+Public discussions
+==================
+* [CK mailing list](http://groups.google.com/group/collective-knowledge)
+
+![logo](https://github.com/ctuning/ck-guide-images/blob/master/logo-validated-by-the-community-simple.png)
