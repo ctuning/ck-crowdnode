@@ -1059,7 +1059,9 @@ void processShell(int sock, cJSON* commandJSON, char *baseDir) {
 void processState(int sock, const char *baseDir) {
     cJSON *resultJSON = cJSON_CreateObject();
     cJSON_AddItemToObject(resultJSON, "return", cJSON_CreateString("0"));
-    cJSON_AddItemToObject(resultJSON, JSON_CONFIG_PARAM_PATH_TO_FILES, cJSON_CreateString(strdup(baseDir)));
+    cJSON *cfgJSON = cJSON_CreateObject();
+    cJSON_AddItemToObject(cfgJSON, JSON_CONFIG_PARAM_PATH_TO_FILES, cJSON_CreateString(strdup(baseDir)));
+    cJSON_AddItemToObject(resultJSON, "cfg", cfgJSON);
     sendJson(sock, resultJSON);
     cJSON_Delete(resultJSON);
 }
